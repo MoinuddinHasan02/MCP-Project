@@ -1,0 +1,27 @@
+
+# Compiled binaries and objects
+
+*.o
+
+sslsniff
+
+vmlinux.h
+
+sslsniff.skel.h
+
+
+
+# Logs and captures
+
+*.err
+
+*.jsonl
+
+
+
+# Python artifacts
+
+__pycache__/
+
+*.pyc
+
