@@ -1,0 +1,15 @@
+
+{
+
+  "allowed_tools": {
+
+    "ping": { "action": "allow" },
+
+    "read_file": { "action": "allow", "allowed_paths": ["/tmp/safe_dir"] },
+
+    "execute_command": { "action": "block" }
+
+  }
+
+}
+

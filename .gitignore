@@ -1,27 +1,23 @@
 
-# Compiled binaries and objects
-
-*.o
-
-sslsniff
-
-vmlinux.h
-
-sslsniff.skel.h
-
-
-
-# Logs and captures
-
-*.err
+# Logs and benchmark artifacts
 
 *.jsonl
 
+*.log
+
+stress_results.jsonl
 
 
-# Python artifacts
+
+# Python cache
 
 __pycache__/
 
 *.pyc
+
+
+
+# Local baseline clone
+
+baseline-mcpguard/
 

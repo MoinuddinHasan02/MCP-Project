@@ -1,0 +1,2 @@
+sslsniff: 10 hooks attached to /lib/x86_64-linux-gnu/libssl.so.3 (pid filter -1)
+sslsniff: dropped=0 read_fail=0
