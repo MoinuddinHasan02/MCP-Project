@@ -1,70 +1,34 @@
-import sys
-import json
-import os
-from unittest.mock import MagicMock
+import sys, json, re, urllib.parse, urllib.request
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+def check(args):
+    for k, v in args.items():
+        if isinstance(v, str):
+            c = re.sub(r'\\x([0-9a-fA-F]{2})', lambda m: chr(int(m.group(1), 16)), urllib.parse.unquote(v))
+            for p in [r'\bsudo\b', r'rm\ls+-rf', r'\bcurl\b', r'\bwget\b', r'\|\\s+bash']:
+                if re.search(p, c, re.IGNORECASE): return "flag", f"Matched {p}"
+    return "clean", "OK"
 
-try:
-    from proxy import argument_validator
-except ImportError as e:
-    sys.stderr.write(f"Error loading Meta's dependencies: {e}\n")
-    sys.exit(1)
-
-class MetaSemanticAdapter:
-    def __init__(self):
-        self.fake_policy_engine = MagicMock()
-        self.validator = argument_validator.ArgumentValidator(self.fake_policy_engine)
-
-    def _extract_strings(self, obj):
-        """Recursively yields all string values from arguments."""
-        if isinstance(obj, str):
-            yield obj
-        elif isinstance(obj, dict):
-            for v in obj.values():
-                yield from self._extract_strings(v)
-        elif isinstance(obj, list):
-            for item in obj:
-                yield from self._extract_strings(item)
-
-    def inspect(self, tool_name, arguments):
+for line in sys.stdin:
+    if not line.strip(): continue
+    try:
+        ev = json.loads(line.strip())
+        if ev.get("policy_decision") == "allow":
+            dec, reason = check(ev.get("params", {}).get("arguments", {}))
+            ev["semantic_decision"] = dec
+            if dec == "flag":
+                ev["reason"] = reason
+                with open("/tmp/trueintent_abort.signal", "w") as f:
+                    f.write("abort")
+                sys.stderr.write("\n[🚠 IPS TRIGGERED] Threat Detected!\n")
+                sys.stderr.flush()
+        
         try:
-            # Check all argument values using Meta's injection scanner
-            for val in self._extract_strings(arguments):
-                result = self.validator.check_injection(val)
-                if isinstance(result, dict) and result.get("action") == "DENY":
-                    return "flag", f"Meta check_injection DENY: {result.get('reason')}"
-            
-            return "clean", "Passed Meta semantic inspection"
-        except Exception as e:
-            return "flag", f"Semantic inspection error: {type(e).__name__} - {str(e)}"
-
-if __name__ == "__main__":
-    adapter = MetaSemanticAdapter()
-    
-    for line in sys.stdin:
-        line = line.strip()
-        if not line:
-            continue
-            
-        try:
-            msg = json.loads(line)
-            
-            if msg.get("policy_decision") == "allow" and msg.get("msg_type") == "request":
-                payload = msg.get("mcp_payload", {})
-                tool_name = msg.get("tool_name", "")
-                arguments = payload.get("params", {}).get("arguments", {})
-                
-                decision, reason = adapter.inspect(tool_name, arguments)
-                msg["semantic_decision"] = decision
-                msg["semantic_reason"] = reason
-                
-            elif msg.get("policy_decision") == "block":
-                msg["semantic_decision"] = "skipped"
-                msg["semantic_reason"] = "Execution already blocked by capability policy"
-                
-            print(json.dumps(msg))
-            sys.stdout.flush()
-            
-        except json.JSONDecodeError:
-            sys.stderr.write("Failed to decode JSON message in semantic adapter.\n")
+            req = urllib.request.Request("http://127.0.0.1:5000", data=json.dumps(ev).encode(), headers={"Content-Type": "application/json"})
+            urllib.request.urlopen(req, timeout=1)
+        except Exception:
+            pass
+        
+        print(json.dumps(ev))
+        sys.stdout.flush()
+    except Exception:
+        pass

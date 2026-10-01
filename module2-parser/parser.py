@@ -1,127 +1,50 @@
 import sys
-
-import json
-
 import re
+import base64
+import urllib.parse
 
-
-
-class MCPParser:
-
+class PayloadDeobfuscator:
     def __init__(self):
+        self.hex_pattern = re.compile(r'(?:\\x[0-9a-fA-F]{2})+')
+        self.b64_pattern = re.compile(r'(?:[A-Za-z0-9+/]{4}){3,}(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?')
 
-        # Buffers keyed by a tuple of (conn_id, dir)
-
-        self.buffers = {}
-
-        self.decoder = json.JSONDecoder()
-
-
-
-    def process_line(self, line):
-
-        try:
-
-            event = json.loads(line)
-
-        except json.JSONDecodeError:
-
-            return []
-
+    def analyze(self, raw_payload, depth=0):
+        if depth > 5:  
+            return raw_payload
             
+        current_payload = raw_payload
 
-        conn_id = event.get('conn_id')
-
-        direction = event.get('dir')
-
-        key = (conn_id, direction)
-
-        data = event.get('data', '')
-
-        
-
-        if key not in self.buffers:
-
-            self.buffers[key] = ""
-
-            
-
-        self.buffers[key] += data
-
-        return self.extract_messages(key, event)
-
-
-
-    def extract_messages(self, key, event):
-
-        messages = []
-
-        buffer = self.buffers[key]
-
-        
-
-        while buffer:
-
-            # Strip leading whitespace
-
-            buffer = buffer.lstrip(' \t\n\r')
-
-            
-
-            # Identify and strip HTTP headers (POST, GET, HTTP/1.x)
-
-            http_match = re.match(r'^(?:POST|GET|HTTP/1\.[01]).*?\r\n\r\n', buffer, re.DOTALL)
-            if http_match:
-                buffer = buffer[http_match.end():].lstrip(' \t\n\r')
-                continue
-                
-            if not buffer:
-                break
-                
-            # If it looks like JSON, attempt to parse it
-            if buffer.startswith('{'):
+        if self.hex_pattern.search(current_payload):
+            def replace_hex(match):
+                raw_bytes = match.group(0).replace('\\x', '')
                 try:
-                    obj, idx = self.decoder.raw_decode(buffer)
-                    
-                    # Extract explicit fields for Module 3
-                    msg_type = "request" if "method" in obj and "id" in obj else "response"
-                    if "method" in obj and "id" not in obj:
-                        msg_type = "notification"
-                        
-                    # Create the structured internal object
-                    structured_msg = {
-                        "ts_ns": event.get("ts_ns"),
-                        "conn_id": key[0],
-                        "dir": key[1],
-                        "msg_type": msg_type,
-                        "method": obj.get("method", ""),
-                        "tool_name": obj.get("params", {}).get("name", "") if isinstance(obj.get("params"), dict) else "",
-                        "mcp_payload": obj
-                    }
-                    messages.append(structured_msg)
-                    
-                    # Advance the buffer past the parsed JSON object
-                    buffer = buffer[idx:]
-                except json.JSONDecodeError:
-                    # Incomplete JSON message; wait for the next chunk
-                    break
-            else:
-                # Log malformed bytes to stderr instead of failing silently
-                sys.stderr.write(f"Discarding non-JSON byte: {repr(buffer[0])}\n")
-                buffer = buffer[1:]
-                
-        # Save the remaining incomplete bytes back to the buffer state
-        self.buffers[key] = buffer
-        return messages
+                    return bytes.fromhex(raw_bytes).decode('utf-8', errors='ignore')
+                except ValueError:
+                    return match.group(0)
+            current_payload = self.hex_pattern.sub(replace_hex, current_payload)
+
+        if '%' in current_payload:
+            current_payload = urllib.parse.unquote(current_payload)
+
+        for b64_match in self.b64_pattern.findall(current_payload):
+            try:
+                padded = b64_match + "=" * ((4 - len(b64_match) % 4) % 4)
+                decoded = base64.b64decode(padded).decode('utf-8')
+                if any(c in decoded for c in ['-', '/', ' ', '\\', '$', '|', '>']):
+                     current_payload = current_payload.replace(b64_match, decoded)
+            except Exception:
+                pass
+
+        if current_payload != raw_payload:
+            return self.analyze(current_payload, depth + 1)
+            
+        return current_payload
 
 if __name__ == "__main__":
-    parser = MCPParser()
-    # Read from standard input in real-time
+    deobfuscator = PayloadDeobfuscator()
     for line in sys.stdin:
         line = line.strip()
-        if not line:
-            continue
-        parsed_msgs = parser.process_line(line)
-        for msg in parsed_msgs:
-            # Output the cleanly parsed MCP message as JSON
-            print(json.dumps(msg))
+        if line:
+            decoded = deobfuscator.analyze(line)
+            print(f"[PARSER] Analyzed: {decoded}")
+            sys.stdout.flush()
