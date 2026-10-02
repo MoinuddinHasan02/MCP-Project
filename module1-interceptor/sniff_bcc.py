@@ -37,6 +37,14 @@ BPF_PERF_OUTPUT(ssl_events);
 int trace_ssl_write(struct pt_regs *ctx, void *ssl, void *buf, int num) {
     struct ssl_data_t data = {};
     
+    // Initialize struct fields manually (BPF verifier doesn't allow memset)
+    data.pid = 0;
+    data.tid = 0;
+    data.timestamp_ns = 0;
+    data.fd = 0;
+    data.len = 0;
+    data.direction = 0;
+    
     // Get process info
     data.pid = bpf_get_current_pid_tgid() >> 32;
     data.tid = bpf_get_current_pid_tgid();
@@ -44,7 +52,7 @@ int trace_ssl_write(struct pt_regs *ctx, void *ssl, void *buf, int num) {
     bpf_get_current_comm(&data.comm, sizeof(data.comm));
     
     // Get file descriptor (SSL structure contains fd)
-    bpf_probe_read(&data.fd, sizeof(data.fd), (void *)ssl);
+    bpf_probe_read_user(&data.fd, sizeof(data.fd), (void *)ssl);
     
     // Read the buffer being written
     data.len = num;
@@ -52,16 +60,24 @@ int trace_ssl_write(struct pt_regs *ctx, void *ssl, void *buf, int num) {
         data.len = MAX_BUF_SIZE;
     }
     
-    bpf_probe_read(&data.buf, data.len, buf);
+    bpf_probe_read_user(&data.buf, data.len & (MAX_BUF_SIZE - 1), buf);
     data.direction = 1;  // write
     
     ssl_events.perf_submit(ctx, &data, sizeof(data));
     return 0;
 }
 
-// Hook SSL_read
+// Hook SSL_read  
 int trace_ssl_read(struct pt_regs *ctx, void *ssl, void *buf, int num) {
     struct ssl_data_t data = {};
+    
+    // Initialize struct fields manually (BPF verifier doesn't allow memset)
+    data.pid = 0;
+    data.tid = 0;
+    data.timestamp_ns = 0;
+    data.fd = 0;
+    data.len = 0;
+    data.direction = 0;
     
     // Get process info
     data.pid = bpf_get_current_pid_tgid() >> 32;
@@ -70,7 +86,7 @@ int trace_ssl_read(struct pt_regs *ctx, void *ssl, void *buf, int num) {
     bpf_get_current_comm(&data.comm, sizeof(data.comm));
     
     // Get file descriptor
-    bpf_probe_read(&data.fd, sizeof(data.fd), (void *)ssl);
+    bpf_probe_read_user(&data.fd, sizeof(data.fd), (void *)ssl);
     
     // Read the buffer being read
     data.len = num;
@@ -78,7 +94,7 @@ int trace_ssl_read(struct pt_regs *ctx, void *ssl, void *buf, int num) {
         data.len = MAX_BUF_SIZE;
     }
     
-    bpf_probe_read(&data.buf, data.len, buf);
+    bpf_probe_read_user(&data.buf, data.len & (MAX_BUF_SIZE - 1), buf);
     data.direction = 0;  // read
     
     ssl_events.perf_submit(ctx, &data, sizeof(data));
