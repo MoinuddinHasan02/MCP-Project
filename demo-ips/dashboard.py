@@ -13,6 +13,24 @@ import os
 
 import signal
 
+import base64
+
+
+
+# Import authentication
+
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'module3-policy'))
+
+from auth import get_auth_manager
+
+
+
+# Initialize authentication manager
+
+auth_manager = get_auth_manager()
+
 
 
 PORT = 5000
@@ -170,7 +188,55 @@ class DashboardServer(http.server.BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         return
 
+    def _check_auth(self):
+        """Check Basic Authentication credentials"""
+        auth_header = self.headers.get('Authorization')
+        
+        if not auth_header:
+            return False, None
+        
+        try:
+            # Parse Basic Auth header
+            auth_type, auth_string = auth_header.split(' ', 1)
+            if auth_type.lower() != 'basic':
+                return False, None
+            
+            # Decode credentials
+            decoded = base64.b64decode(auth_string).decode('utf-8')
+            username, password = decoded.split(':', 1)
+            
+            # Validate credentials
+            valid, role = auth_manager.validate_dashboard_credentials(username, password)
+            return valid, username
+        
+        except Exception:
+            return False, None
+    
+    def _send_auth_required(self):
+        """Send 401 Unauthorized response"""
+        self.send_response(401)
+        self.send_header('WWW-Authenticate', 'Basic realm="TrueIntent Dashboard"')
+        self.send_header('Content-Type', 'text/html')
+        self.end_headers()
+        self.wfile.write(b"""
+            <!DOCTYPE html>
+            <html>
+            <head><title>Authentication Required</title></head>
+            <body style="background: #0b0f19; color: #f3f4f6; font-family: monospace; padding: 50px;">
+                <h1 style="color: #38bdf8;">&#128274; Authentication Required</h1>
+                <p>Please provide valid credentials to access the TrueIntent Security Dashboard.</p>
+            </body>
+            </html>
+        """)
+
     def do_GET(self):
+        # Check authentication
+        authenticated, username = self._check_auth()
+        
+        if not authenticated:
+            self._send_auth_required()
+            return
+        
         if self.path == "/":
             self.send_response(200)
             self.send_header("Content-Type", "text/html")
@@ -213,9 +279,8 @@ class DashboardServer(http.server.BaseHTTPRequestHandler):
             tool = "execute_command"
             detail = "sudo rm -rf / (Dangerous privileged execution blocked)"
             METRICS["blocked"] += 1
-            # Arm active abort signal for the server
-            with open("/tmp/trueintent_abort.signal", "w") as f:
-                f.write("abort")
+            # Note: Actual blocking is handled by the request-ID-based mechanism
+            # in the server, not by file signals
 
         METRICS["inspected"] += 1
         EVENTS.append({

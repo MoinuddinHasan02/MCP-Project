@@ -2,6 +2,10 @@ import sys, os, json, ssl, urllib.request, time
 from google import genai
 from google.genai import types
 
+# Import secure temp manager
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'module3-policy'))
+from secure_temp import get_secure_log_path
+
 API_KEY = os.environ.get("GEMINI_API_KEY")
 client = genai.Client(api_key=API_KEY)
 
@@ -12,21 +16,15 @@ def dispatch_mcp_tls(tool_name, arguments):
     print(f"\n[*] Agent executing MCP Tool Call over TLS: {tool_name}({arguments})")
     payload = {"jsonrpc": "2.0", "id": 101, "method": "tools/call", "params": {"name": tool_name, "arguments": arguments}}
 
-    if os.path.exists("/tmp/trueintent_abort.signal"):
-        os.remove("/tmp/trueintent_abort.signal")
-        
+    # Use secure log file
+    secure_log = get_secure_log_path()
+    
     # Send packet to the Pipeline
-    with open("/tmp/trueintent_ebpf_stream.log", "a") as f:
+    with open(secure_log, "a") as f:
         f.write(json.dumps(payload) + "\n")
         
     # Wait for pipeline to process
     time.sleep(1.5)
-    
-    # Check if PIPELINE killed it
-    if os.path.exists("/tmp/trueintent_abort.signal"):
-        print(f"\n[!] CONNECTION TERMINATED BY TRUEINTENT IPS:")
-        print("    --> The eBPF kernel firewall caught the payload and dropped it at the socket layer.")
-        return
 
     url = "https://127.0.0.1:8443/mcp"
     ctx = ssl.create_default_context()
@@ -36,8 +34,17 @@ def dispatch_mcp_tls(tool_name, arguments):
     try:
         with urllib.request.urlopen(req, context=ctx, timeout=3) as resp:
             print(f"[+] Server Response (200 OK): {resp.read().decode('utf-8')}")
+    except urllib.error.HTTPError as e:
+        if e.code == 403:
+            print(f"\n[!] CONNECTION BLOCKED BY TRUEINTENT IPS:")
+            print("    --> The security firewall caught the malicious payload and blocked it.")
+        elif e.code == 429:
+            print(f"\n[!] RATE LIMIT EXCEEDED:")
+            print(f"    --> Too many requests. Retry after {e.headers.get('Retry-After', 'N/A')} seconds.")
+        else:
+            print(f"\n[!] SERVER ERROR: {e.code}")
     except Exception as e:
-        print(f"\n[!] SERVER REJECTED REQUEST / CONNECTION TERMINATED")
+        print(f"\n[!] SERVER REJECTED REQUEST / CONNECTION TERMINATED: {e}")
 
 def run_live_agent(document_path):
     with open(document_path, "r") as f: doc_content = f.read()

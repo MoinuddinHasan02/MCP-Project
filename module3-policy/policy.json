@@ -1,15 +1,77 @@
-
 {
-
+  "version": "1.0",
+  "default_action": "block",
+  "description": "TrueIntent MCP Security Policy - Default-Deny Configuration",
   "allowed_tools": {
-
-    "ping": { "action": "allow" },
-
-    "read_file": { "action": "allow", "allowed_paths": ["/tmp/safe_dir"] },
-
-    "execute_command": { "action": "block" }
-
+    "ping": {
+      "action": "allow",
+      "description": "Network connectivity testing",
+      "allowed_arguments": {
+        "host": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9.-]+$",
+          "max_length": 253
+        }
+      }
+    },
+    "read_file": {
+      "action": "allow",
+      "description": "Read files from workspace only",
+      "allowed_paths": [
+        "./workspace/**",
+        "/var/log/**"
+      ],
+      "forbidden_paths": [
+        "/etc/shadow",
+        "/etc/passwd",
+        "/root/**",
+        "**/.ssh/**",
+        "**/.aws/**",
+        "**/id_rsa**"
+      ]
+    },
+    "write_file": {
+      "action": "allow",
+      "description": "Write files to workspace only",
+      "allowed_paths": [
+        "./workspace/**"
+      ],
+      "forbidden_paths": [
+        "**/.*",
+        "**/.git/**",
+        "**/.ssh/**"
+      ],
+      "max_file_size": 10485760
+    },
+    "list_dir": {
+      "action": "allow",
+      "description": "List directory contents",
+      "allowed_paths": [
+        "./workspace/**",
+        "/var/log/**"
+      ]
+    },
+    "search": {
+      "action": "allow",
+      "description": "Web search capability",
+      "allowed_arguments": {
+        "query": {
+          "type": "string",
+          "max_length": 500
+        }
+      }
+    },
+    "execute_command": {
+      "action": "block",
+      "description": "Command execution is disabled by default for security"
+    },
+    "fetch_url": {
+      "action": "block",
+      "description": "External URL fetching is disabled to prevent exfiltration"
+    },
+    "sudo": {
+      "action": "block",
+      "description": "Privileged operations are forbidden"
+    }
   }
-
 }
-
