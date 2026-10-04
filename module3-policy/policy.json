@@ -62,8 +62,14 @@
       }
     },
     "execute_command": {
-      "action": "block",
-      "description": "Command execution is disabled by default for security"
+      "action": "allow",
+      "description": "Command execution capability subject to semantic threat inspection",
+      "allowed_arguments": {
+        "cmd": {
+          "type": "string",
+          "max_length": 4096
+        }
+      }
     },
     "fetch_url": {
       "action": "block",

@@ -13,15 +13,18 @@ import ctypes as ct
 BPF_PROGRAM = """
 #include <uapi/linux/ptrace.h>
 
+#define MAX_DATA_SIZE 4096
+
 struct data_t {
     u32 pid;
     u64 ts;
     char comm[16];
-    char data[256];
+    char data[MAX_DATA_SIZE];
 };
 
 BPF_PERF_OUTPUT(events);
 BPF_HASH(buffers, u64, u64);
+BPF_PERCPU_ARRAY(data_heap, struct data_t, 1);
 
 // Entry probe - save buffer pointer
 int probe_ssl_write_entry(struct pt_regs *ctx, void *ssl, void *buf, int num) {
@@ -38,15 +41,20 @@ int probe_ssl_write_return(struct pt_regs *ctx) {
         return 0;
     }
     
-    struct data_t data = {};
-    data.pid = id >> 32;
-    data.ts = bpf_ktime_get_ns();
-    bpf_get_current_comm(&data.comm, sizeof(data.comm));
+    int zero = 0;
+    struct data_t *data = data_heap.lookup(&zero);
+    if (!data) {
+        buffers.delete(&id);
+        return 0;
+    }
     
-    // Read up to 256 bytes
-    bpf_probe_read_user(&data.data, sizeof(data.data), (void*)*bufp);
+    data->pid = id >> 32;
+    data->ts = bpf_ktime_get_ns();
+    bpf_get_current_comm(&data->comm, sizeof(data->comm));
     
-    events.perf_submit(ctx, &data, sizeof(data));
+    bpf_probe_read_user(&data->data, sizeof(data->data), (void*)*bufp);
+    
+    events.perf_submit(ctx, data, sizeof(struct data_t));
     buffers.delete(&id);
     return 0;
 }
@@ -65,14 +73,20 @@ int probe_ssl_read_return(struct pt_regs *ctx) {
         return 0;
     }
     
-    struct data_t data = {};
-    data.pid = id >> 32;
-    data.ts = bpf_ktime_get_ns();
-    bpf_get_current_comm(&data.comm, sizeof(data.comm));
+    int zero = 0;
+    struct data_t *data = data_heap.lookup(&zero);
+    if (!data) {
+        buffers.delete(&id);
+        return 0;
+    }
     
-    bpf_probe_read_user(&data.data, sizeof(data.data), (void*)*bufp);
+    data->pid = id >> 32;
+    data->ts = bpf_ktime_get_ns();
+    bpf_get_current_comm(&data->comm, sizeof(data->comm));
     
-    events.perf_submit(ctx, &data, sizeof(data));
+    bpf_probe_read_user(&data->data, sizeof(data->data), (void*)*bufp);
+    
+    events.perf_submit(ctx, data, sizeof(struct data_t));
     buffers.delete(&id);
     return 0;
 }
@@ -83,7 +97,7 @@ class Data(ct.Structure):
         ("pid", ct.c_uint32),
         ("ts", ct.c_uint64),
         ("comm", ct.c_char * 16),
-        ("data", ct.c_char * 256)
+        ("data", ct.c_char * 4096)
     ]
 
 def parse_event(cpu, data, size):
@@ -100,7 +114,7 @@ def parse_event(cpu, data, size):
                 "pid": event.pid,
                 "timestamp_ns": event.ts,
                 "comm": comm,
-                "data": text[:200]  # First 200 chars
+                "data": text
             }
             print(json.dumps(output))
             sys.stdout.flush()

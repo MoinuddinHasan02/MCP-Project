@@ -16,6 +16,8 @@ STATS_URL = "https://127.0.0.1:8443/stats"
 ssl_context = ssl._create_unverified_context()
 
 
+API_KEY = "AuULuUlCTYPoT__SD2QBsN2h_PpZdpyjvFVBVjDQdzM"
+
 def send_request(req_id):
     """Send a single MCP request"""
     payload = json.dumps({
@@ -28,7 +30,7 @@ def send_request(req_id):
     req = urllib.request.Request(
         TARGET_URL,
         data=payload,
-        headers={"Content-Type": "application/json"}
+        headers={"Content-Type": "application/json", "X-API-Key": API_KEY}
     )
     
     try:
@@ -45,7 +47,10 @@ def send_request(req_id):
             }
     except urllib.error.HTTPError as e:
         headers = dict(e.headers)
-        body = e.read().decode('utf-8')
+        try:
+            body = e.read().decode('utf-8', errors='ignore')
+        except Exception:
+            body = ""
         return {
             "id": req_id,
             "status": e.code,
@@ -64,6 +69,8 @@ def send_request(req_id):
         }
 
 
+RESET_URL = "https://127.0.0.1:8443/reset-limits"
+
 def get_stats():
     """Get rate limit statistics"""
     try:
@@ -72,6 +79,15 @@ def get_stats():
             return json.loads(response.read().decode('utf-8'))
     except Exception as e:
         return {"error": str(e)}
+
+def reset_limits():
+    """Reset rate limits on the server for test isolation"""
+    try:
+        req = urllib.request.Request(RESET_URL)
+        with urllib.request.urlopen(req, context=ssl_context, timeout=5) as response:
+            return True
+    except Exception:
+        return False
 
 
 def test_normal_operation():
@@ -162,10 +178,10 @@ def test_recovery_after_rate_limit():
     print("TEST 4: Recovery After Rate Limit")
     print("="*70)
     
-    # First, exhaust the rate limit
+    # First, exhaust the rate limit (burst size is 20)
     print("Step 1: Exhausting rate limit...")
-    with ThreadPoolExecutor(max_workers=50) as executor:
-        futures = [executor.submit(send_request, i) for i in range(50)]
+    with ThreadPoolExecutor(max_workers=25) as executor:
+        futures = [executor.submit(send_request, i) for i in range(25)]
         [f.result() for f in as_completed(futures)]
     
     # Wait for recovery (tokens refill at 10/sec)
@@ -218,17 +234,24 @@ def main():
     print("="*70)
     print("MCP Server Rate Limiting Test Suite")
     print("="*70)
-    print("\nEnsure the MCP server is running on https://127.0.0.1:8443")
-    print("Press Enter to start tests...")
-    input()
+    print("\nConnecting to MCP server on https://127.0.0.1:8443...")
     
     results = []
     
     try:
+        reset_limits()
         results.append(("Normal Operation", test_normal_operation()))
+        time.sleep(1)
+        reset_limits()
         results.append(("Burst Handling", test_burst_handling()))
+        time.sleep(1)
+        reset_limits()
         results.append(("Rate Limit Enforcement", test_rate_limit_enforcement()))
+        time.sleep(1)
+        reset_limits()
         results.append(("Recovery After Rate Limit", test_recovery_after_rate_limit()))
+        time.sleep(1)
+        reset_limits()
         results.append(("Statistics Endpoint", test_statistics_endpoint()))
     except KeyboardInterrupt:
         print("\n\nTest interrupted by user")

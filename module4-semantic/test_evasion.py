@@ -19,7 +19,7 @@ class TestAdvancedDeobfuscator(unittest.TestCase):
         self.deobfuscator = AdvancedDeobfuscator()
     
     def test_hex_escape_decoding(self):
-        """Test \x hex escape decoding"""
+        r"""Test \x hex escape decoding"""
         obfuscated = r"\x73\x75\x64\x6f\x20\x72\x6d\x20\x2d\x72\x66\x20\x2f"
         result = self.deobfuscator.decode_hex_escapes(obfuscated)
         self.assertIn("sudo rm -rf /", result)

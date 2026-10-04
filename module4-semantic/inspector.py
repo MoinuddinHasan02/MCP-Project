@@ -309,77 +309,91 @@ def notify_server_block(req_id):
         sys.stderr.write(f"[WARN] Could not notify server of block: {e}\n")
 
 
-# Initialize detector
-detector = ThreatDetector()
+if __name__ == "__main__":
+    # Initialize detector
+    detector = ThreatDetector()
 
-for line in sys.stdin:
-    if not line.strip():
-        continue
-    
-    try:
-        ev = json.loads(line.strip())
+    sys.stderr.write("[Inspector] Semantic threat detector initialized\n")
+    sys.stderr.write("[Inspector] Loaded 60+ detection patterns\n")
+    sys.stderr.write("[Inspector] Waiting for policy engine output...\n")
+    sys.stderr.flush()
+
+    for line in sys.stdin:
+        line = line.strip()
         
-        # Only perform semantic inspection on allowed tool calls
-        if ev.get("policy_decision") == "allow":
-            # Extract arguments from the message
-            arguments = ev.get("mcp_payload", {}).get("params", {}).get("arguments", {})
-            
-            # Perform threat detection
-            decision, reason, details = detector.check_arguments(arguments)
-            
-            ev["semantic_decision"] = decision
-            ev["semantic_reason"] = reason
-            
-            if details:
-                ev["threat_details"] = details
-            
-            if decision == "flag":
-                req_id = ev.get("mcp_payload", {}).get("id")
-                
-                # Log threat detection
-                client_ip = ev.get("client_ip", "unknown")
-                audit_logger.log_threat_detected(
-                    client_ip,
-                    "semantic_inspection",
-                    {
-                        "reason": reason,
-                        "details": details
-                    },
-                    request_id=req_id
-                )
-                
-                # Notify server to block this specific request ID
-                if req_id:
-                    notify_server_block(req_id)
-                
-                sys.stderr.write(f"\n[🚨 IPS TRIGGERED] Threat Detected: {reason}\n")
-                if details.get("detections"):
-                    for detection in details["detections"][:3]:  # Show first 3
-                        sys.stderr.write(f"  ↳ {detection['description']}: '{detection['matched']}'\n")
-                sys.stderr.write(f"[🚨 IPS TRIGGERED] Request ID {req_id} has been blocked\n")
-                sys.stderr.flush()
-        else:
-            # Policy already denied, pass through
-            ev["semantic_decision"] = "skipped"
-            ev["semantic_reason"] = "Blocked by policy engine"
+        # Skip empty lines
+        if not line:
+            continue
         
-        # Send event to dashboard for monitoring
+        # Skip non-JSON lines (debug output from other modules)
+        if not line.startswith('{'):
+            sys.stderr.write(f"[Inspector] Skipping non-JSON line: {line[:50]}\n")
+            continue
+        
         try:
-            req = urllib.request.Request(
-                "http://127.0.0.1:5000/events",
-                data=json.dumps(ev).encode(),
-                headers={"Content-Type": "application/json"}
-            )
-            urllib.request.urlopen(req, timeout=1)
-        except Exception:
-            pass  # Dashboard might not be running
-        
-        print(json.dumps(ev))
-        sys.stdout.flush()
-        
-    except json.JSONDecodeError as e:
-        sys.stderr.write(f"[ERROR] Failed to decode JSON in semantic inspector: {e}\n")
-    except Exception as e:
-        sys.stderr.write(f"[ERROR] Semantic inspector exception: {e}\n")
-        import traceback
-        traceback.print_exc(file=sys.stderr)
+            ev = json.loads(line)
+            
+            # Only perform semantic inspection on allowed tool calls
+            if ev.get("policy_decision") == "allow":
+                # Extract arguments from the message
+                arguments = ev.get("mcp_payload", {}).get("params", {}).get("arguments", {})
+                
+                # Perform threat detection
+                decision, reason, details = detector.check_arguments(arguments)
+                
+                ev["semantic_decision"] = decision
+                ev["semantic_reason"] = reason
+                
+                if details:
+                    ev["threat_details"] = details
+                
+                if decision == "flag":
+                    req_id = ev.get("mcp_payload", {}).get("id")
+                    
+                    # Log threat detection
+                    client_ip = ev.get("client_ip", "unknown")
+                    audit_logger.log_threat_detected(
+                        client_ip,
+                        "semantic_inspection",
+                        {
+                            "reason": reason,
+                            "details": details
+                        },
+                        request_id=req_id
+                    )
+                    
+                    # Notify server to block this specific request ID
+                    if req_id is not None:
+                        notify_server_block(req_id)
+                    
+                    sys.stderr.write(f"\n[🚨 IPS TRIGGERED] Threat Detected: {reason}\n")
+                    if details.get("detections"):
+                        for detection in details["detections"][:3]:  # Show first 3
+                            sys.stderr.write(f"  ↳ {detection['description']}: '{detection['matched']}'\n")
+                    sys.stderr.write(f"[🚨 IPS TRIGGERED] Request ID {req_id} has been blocked\n")
+                    sys.stderr.flush()
+            else:
+                # Policy already denied, pass through
+                ev["semantic_decision"] = "skipped"
+                ev["semantic_reason"] = "Blocked by policy engine"
+            
+            # Send event to dashboard for monitoring
+            try:
+                req = urllib.request.Request(
+                    "http://127.0.0.1:5000/events",
+                    data=json.dumps(ev).encode(),
+                    headers={"Content-Type": "application/json"}
+                )
+                urllib.request.urlopen(req, timeout=1)
+            except Exception:
+                pass  # Dashboard might not be running
+            
+            print(json.dumps(ev))
+            sys.stdout.flush()
+            
+        except json.JSONDecodeError as e:
+            sys.stderr.write(f"[ERROR] Failed to decode JSON in semantic inspector: {e}\n")
+        except Exception as e:
+            sys.stderr.write(f"[ERROR] Semantic inspector exception: {e}\n")
+            import traceback
+            traceback.print_exc(file=sys.stderr)

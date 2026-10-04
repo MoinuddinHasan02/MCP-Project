@@ -1,5 +1,5 @@
 
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import HTTPServer, ThreadingHTTPServer, BaseHTTPRequestHandler
 
 import ssl
 
@@ -337,17 +337,7 @@ class SecureMCPHandler(BaseHTTPRequestHandler):
 
             
 
-            self.send_response(401)  # Unauthorized
-
-            self.send_header('Content-Type', 'application/json')
-
-            self.send_header('WWW-Authenticate', 'Bearer realm="MCP Server"')
-
-            self.end_headers()
-
-            
-
-            self.wfile.write(json.dumps({
+            resp_bytes = json.dumps({
 
                 "jsonrpc": "2.0",
 
@@ -359,7 +349,19 @@ class SecureMCPHandler(BaseHTTPRequestHandler):
 
                 }
 
-            }).encode('utf-8'))
+            }).encode('utf-8')
+
+            self.send_response(401)  # Unauthorized
+
+            self.send_header('Content-Type', 'application/json')
+
+            self.send_header('WWW-Authenticate', 'Bearer realm="MCP Server"')
+
+            self.send_header('Content-Length', str(len(resp_bytes)))
+
+            self.end_headers()
+
+            self.wfile.write(resp_bytes)
 
             
 
@@ -399,21 +401,7 @@ class SecureMCPHandler(BaseHTTPRequestHandler):
 
             
 
-            self.send_response(429)  # Too Many Requests
-
-            self.send_header('Content-Type', 'application/json')
-
-            self.send_header('Retry-After', str(retry_after))
-
-            self.send_header('X-RateLimit-Limit', str(rate_limiter.burst_size))
-
-            self.send_header('X-RateLimit-Remaining', '0')
-
-            self.end_headers()
-
-            
-
-            self.wfile.write(json.dumps({
+            resp_bytes = json.dumps({
 
                 "jsonrpc": "2.0",
 
@@ -433,7 +421,23 @@ class SecureMCPHandler(BaseHTTPRequestHandler):
 
                 }
 
-            }).encode('utf-8'))
+            }).encode('utf-8')
+
+            self.send_response(429)  # Too Many Requests
+
+            self.send_header('Content-Type', 'application/json')
+
+            self.send_header('Retry-After', str(retry_after))
+
+            self.send_header('X-RateLimit-Limit', str(rate_limiter.burst_size))
+
+            self.send_header('X-RateLimit-Remaining', '0')
+
+            self.send_header('Content-Length', str(len(resp_bytes)))
+
+            self.end_headers()
+
+            self.wfile.write(resp_bytes)
 
             
 
@@ -462,9 +466,15 @@ class SecureMCPHandler(BaseHTTPRequestHandler):
             
 
             # Check if this specific request ID has been blocked by IPS
+            # For tool requests, allow a brief grace period (up to 200ms) for out-of-band
+            # eBPF inspection pipeline to inspect payload and signal blocking.
+            for _ in range(10):
+                with blocked_requests_lock:
+                    if req_id in blocked_requests:
+                        break
+                time.sleep(0.02)
 
             with blocked_requests_lock:
-
                 if req_id in blocked_requests:
 
                     # Remove from blocked set after use
@@ -477,13 +487,7 @@ class SecureMCPHandler(BaseHTTPRequestHandler):
 
                     
 
-                    self.send_response(403)
-
-                    self.send_header('Content-Type', 'application/json')
-
-                    self.end_headers()
-
-                    self.wfile.write(json.dumps({
+                    resp_bytes = json.dumps({
 
                         "jsonrpc": "2.0",
 
@@ -491,7 +495,17 @@ class SecureMCPHandler(BaseHTTPRequestHandler):
 
                         "error": {"code": -32000, "message": "CRITICAL: Blocked by TrueIntent eBPF IPS Enforcement"}
 
-                    }).encode('utf-8'))
+                    }).encode('utf-8')
+
+                    self.send_response(403)
+
+                    self.send_header('Content-Type', 'application/json')
+
+                    self.send_header('Content-Length', str(len(resp_bytes)))
+
+                    self.end_headers()
+
+                    self.wfile.write(resp_bytes)
 
                     return
 
@@ -525,6 +539,8 @@ class SecureMCPHandler(BaseHTTPRequestHandler):
 
             
 
+            resp_bytes = json.dumps(response).encode('utf-8')
+
             self.send_response(200)
 
             self.send_header('Content-Type', 'application/json')
@@ -533,27 +549,31 @@ class SecureMCPHandler(BaseHTTPRequestHandler):
 
             self.send_header('X-RateLimit-Remaining', str(stats["available_tokens"]))
 
+            self.send_header('Content-Length', str(len(resp_bytes)))
+
             self.end_headers()
 
-            
-
-            self.wfile.write(json.dumps(response).encode('utf-8'))
+            self.wfile.write(resp_bytes)
 
         except Exception as e:
 
-            self.send_response(500)
-
-            self.send_header('Content-Type', 'application/json')
-
-            self.end_headers()
-
-            self.wfile.write(json.dumps({
+            resp_bytes = json.dumps({
 
                 "jsonrpc": "2.0",
 
                 "error": {"code": -32603, "message": f"Internal error: {str(e)}"}
 
-            }).encode('utf-8'))
+            }).encode('utf-8')
+
+            self.send_response(500)
+
+            self.send_header('Content-Type', 'application/json')
+
+            self.send_header('Content-Length', str(len(resp_bytes)))
+
+            self.end_headers()
+
+            self.wfile.write(resp_bytes)
 
     
 
@@ -579,17 +599,23 @@ class SecureMCPHandler(BaseHTTPRequestHandler):
 
                     block_request(req_id)
 
+                    resp_bytes = json.dumps({"status": "blocked", "request_id": req_id}).encode('utf-8')
+
                     self.send_response(200)
 
                     self.send_header('Content-Type', 'application/json')
 
+                    self.send_header('Content-Length', str(len(resp_bytes)))
+
                     self.end_headers()
 
-                    self.wfile.write(json.dumps({"status": "blocked", "request_id": req_id}).encode('utf-8'))
+                    self.wfile.write(resp_bytes)
 
                 else:
 
                     self.send_response(400)
+
+                    self.send_header('Content-Length', '0')
 
                     self.end_headers()
 
@@ -597,11 +623,15 @@ class SecureMCPHandler(BaseHTTPRequestHandler):
 
                 self.send_response(400)
 
+                self.send_header('Content-Length', '0')
+
                 self.end_headers()
 
         except Exception:
 
             self.send_response(500)
+
+            self.send_header('Content-Length', '0')
 
             self.end_headers()
 
@@ -651,18 +681,32 @@ class SecureMCPHandler(BaseHTTPRequestHandler):
 
             
 
+            resp_bytes = json.dumps(response, indent=2).encode('utf-8')
             self.send_response(200)
-
             self.send_header('Content-Type', 'application/json')
-
+            self.send_header('Content-Length', str(len(resp_bytes)))
             self.end_headers()
-
-            self.wfile.write(json.dumps(response, indent=2).encode('utf-8'))
-
+            self.wfile.write(resp_bytes)
+        elif self.path == "/reset-limits":
+            client_ip = self.client_address[0]
+            with rate_limiter.lock:
+                rate_limiter.blacklist.pop(client_ip, None)
+                if client_ip in rate_limiter.buckets:
+                    rate_limiter.buckets[client_ip]["tokens"] = rate_limiter.burst_size
+                    rate_limiter.buckets[client_ip]["last_update"] = time.time()
+                rate_limiter.request_history[client_ip].clear()
+            with blocked_requests_lock:
+                blocked_requests.clear()
+                blocked_requests_expiry.clear()
+            resp_bytes = json.dumps({"status": "reset", "client_ip": client_ip}).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Length', str(len(resp_bytes)))
+            self.end_headers()
+            self.wfile.write(resp_bytes)
         else:
-
             self.send_response(404)
-
+            self.send_header('Content-Length', '0')
             self.end_headers()
 
 def block_request(req_id, expiry_seconds=30):
@@ -684,31 +728,22 @@ def block_request(req_id, expiry_seconds=30):
 
 
 def run_server():
-
     server_address = ('127.0.0.1', 8443)
-
-    httpd = HTTPServer(server_address, SecureMCPHandler)
-
+    httpd = ThreadingHTTPServer(server_address, SecureMCPHandler)
     
-
     # Also start IPS control endpoint on 8444
-
     ips_control_address = ('127.0.0.1', 8444)
-
-    ips_httpd = HTTPServer(ips_control_address, SecureMCPHandler)
+    ips_httpd = ThreadingHTTPServer(ips_control_address, SecureMCPHandler)
 
     
 
     # Try multiple cert locations for flexibility
 
     cert_locations = [
-
-        os.path.expanduser("~/mcp-tls-guard/module1-interceptor"),
-
         os.path.join(os.path.dirname(__file__), "..", "module1-interceptor"),
-
+        os.path.expanduser("~/try/module1-interceptor"),
+        os.path.expanduser("~/mcp-tls-guard/module1-interceptor"),
         os.path.dirname(__file__)
-
     ]
 
     

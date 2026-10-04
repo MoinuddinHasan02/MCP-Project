@@ -157,9 +157,20 @@ class AuthManager:
         
         key_hash = self._hash_key(api_key)
         
-        for key_name, key_data in self.config["mcp_api_keys"].items():
+        for key_name, key_data in self.config.get("mcp_api_keys", {}).items():
             if hmac.compare_digest(key_data["key_hash"], key_hash):
                 return True, key_name
+
+        # Reload from disk if not found (in case keys were added or rotated)
+        if self.config_path.exists():
+            try:
+                with open(self.config_path, 'r') as f:
+                    self.config = json.load(f)
+                for key_name, key_data in self.config.get("mcp_api_keys", {}).items():
+                    if hmac.compare_digest(key_data["key_hash"], key_hash):
+                        return True, key_name
+            except Exception:
+                pass
         
         return False, None
     

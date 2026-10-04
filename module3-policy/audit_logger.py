@@ -343,8 +343,10 @@ class AuditLogger:
         return hmac.compare_digest(stored_hash, computed_hash)
     
     def get_recent_events(self, count=100):
-        """Get recent events from in-memory buffer"""
-        return list(self.recent_events)[-count:]
+        """Get recent events from in-memory buffer or disk log"""
+        if self.recent_events:
+            return list(self.recent_events)[-count:]
+        return self.query(limit=count)
     
     def export_report(self, output_file, start_time=None, end_time=None):
         """
