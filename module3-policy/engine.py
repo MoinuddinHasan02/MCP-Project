@@ -1,3 +1,4 @@
+
 import sys
 
 import json
@@ -357,44 +358,66 @@ class PolicyAdapter:
         return "allow", f"Tool '{tool_name}' execution permitted"
 
     def process_message(self, msg):
-        # Identify the JSON-RPC payload: could be inside msg["mcp_payload"] or msg itself
-        payload = msg.get("mcp_payload") if (isinstance(msg, dict) and isinstance(msg.get("mcp_payload"), dict)) else msg
 
-        # Validate JSON-RPC structure of the payload
-        valid_structure, structure_errors = self.validator.validate_jsonrpc_structure(payload)
+        # First validate JSON-RPC structure
+
+        valid_structure, structure_errors = self.validator.validate_jsonrpc_structure(msg)
+
         if not valid_structure:
+
             msg["policy_decision"] = "block"
+
             msg["policy_reason"] = f"Invalid message structure: {'; '.join(structure_errors)}"
+
             msg["validation_errors"] = structure_errors
+
             return msg
 
-        # We only evaluate requests that are trying to use tools
-        method = payload.get("method") or msg.get("method", "")
-        tool_name = msg.get("tool_name") or (payload.get("params", {}).get("name") if isinstance(payload.get("params"), dict) else "") or method
+        
 
-        msg_type = msg.get("msg_type")
-        if not msg_type:
-            if "method" in payload and "id" in payload:
-                msg_type = "request"
-            elif "method" in payload:
-                msg_type = "notification"
-            else:
-                msg_type = "response"
+        # We only evaluate requests that are trying to use tools
+
+        method = msg.get("method", "")
+
+        payload = msg.get("mcp_payload", {})
+
+        
 
         # Determine if this is a tool execution request
-        is_tool_call = (msg_type == "request") and ("tool" in method.lower() or bool(tool_name))
+
+        is_tool_call = msg.get("msg_type") == "request" and ("tool" in method.lower() or msg.get("tool_name"))
+
+        
 
         if is_tool_call:
-            params = payload.get("params", {}).get("arguments", {}) if isinstance(payload.get("params"), dict) else {}
+
+            # Extract tool name (either from schema or directly from method)
+
+            tool_name = msg.get("tool_name") or method
+
+            params = payload.get("params", {}).get("arguments", {})
+
+            
+
             decision, reason = self.evaluate_tool_call(tool_name, params)
 
+            
+
             # Attach the engine's decision output to the message
+
             msg["policy_decision"] = decision
+
             msg["policy_reason"] = reason
+
         else:
+
             # Non-tool calls pass through
+
             msg["policy_decision"] = "allow"
+
             msg["policy_reason"] = "Not a tool execution request"
+
+            
 
         return msg
 
@@ -444,3 +467,4 @@ if __name__ == "__main__":
         except json.JSONDecodeError as e:
             sys.stderr.write(f"[Policy] Failed to decode JSON: {e}\n")
             sys.stderr.flush()
+
