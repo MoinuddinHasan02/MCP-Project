@@ -21,3 +21,8 @@ __pycache__/
 
 baseline-mcpguard/
 
+# Secrets and environment configs
+env/
+*.env
+.env
+

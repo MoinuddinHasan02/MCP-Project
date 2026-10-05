@@ -18,7 +18,8 @@
       "action": "allow",
       "description": "Read files from workspace only",
       "allowed_paths": [
-        "./workspace/**",
+        "*/workspace/**",
+        "*/public_repo/**",
         "/var/log/**"
       ],
       "forbidden_paths": [
