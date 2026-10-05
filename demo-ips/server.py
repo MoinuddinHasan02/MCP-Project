@@ -526,15 +526,22 @@ class SecureMCPHandler(BaseHTTPRequestHandler):
             
 
             # Normal execution response
+            exec_output = "Execution completed safely."
+            if tool == "read_file":
+                filepath = params.get("arguments", {}).get("path", "")
+                if filepath and os.path.exists(filepath):
+                    try:
+                        with open(filepath, 'r') as f:
+                            exec_output = f.read()
+                    except Exception as e:
+                        exec_output = f"Error reading file: {e}"
+                else:
+                    exec_output = f"File not found: {filepath}"
 
             response = {
-
                 "jsonrpc": "2.0",
-
                 "id": req_id,
-
-                "result": {"status": "success", "executed_tool": tool, "output": "Execution completed safely."}
-
+                "result": {"status": "success", "executed_tool": tool, "output": exec_output}
             }
 
             
