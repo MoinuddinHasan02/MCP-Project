@@ -213,6 +213,10 @@ class ThreatDetector:
             
             # Data exfiltration
             (r'(curl|wget).*http://\d+\.\d+\.\d+\.\d+', 'HTTP to IP address'),
+            (r'\b(curl|wget)\b.*(-d|-F|--data|--upload-file|@)', 'Data exfiltration attempt via HTTP POST'),
+            (r'\b(curl|wget)\b.*https?://', 'External HTTP data transfer attempt'),
+            (r'(\bGITHUB_TOKEN\b|\bGH_TOKEN\b|\.env\b)', 'Sensitive token or environment credential access'),
+            (r'\bgh\s+(pr|repo|api)\b', 'Unauthorized GitHub CLI operation'),
             (r'scp\s+.*@', 'Secure copy to remote'),
             (r'rsync\s+.*@', 'Rsync to remote'),
             (r'ftp\s+', 'FTP transfer'),

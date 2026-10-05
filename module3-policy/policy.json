@@ -27,7 +27,10 @@
         "/root/**",
         "**/.ssh/**",
         "**/.aws/**",
-        "**/id_rsa**"
+        "**/id_rsa**",
+        "**/.env*",
+        "**/private_repo/**",
+        "**/*token*"
       ]
     },
     "write_file": {
