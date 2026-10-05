@@ -286,27 +286,35 @@ def call_grok_api(messages):
     except Exception as e:
         raise RuntimeError(f"Network error calling Grok API: {e}")
 
-def run_agent_turn(user_prompt, conversation_history):
-    """Processes a user prompt through Grok and handles tool calls"""
+def run_agent_turn(user_prompt, conversation_history, max_turns=5):
+    """Processes a user prompt through Grok and iteratively handles tool calls"""
     conversation_history.append({"role": "user", "content": user_prompt})
     print(f"\n{BOLD}{GREEN}User:{RESET} {user_prompt}")
     print(f"{DIM}[*] Sending prompt to Grok ({GROK_MODEL})...{RESET}")
 
-    try:
-        response = call_grok_api(conversation_history)
-    except Exception as e:
-        print(f"{RED}[Error calling Grok]: {e}{RESET}")
-        return
+    current_turn = 0
+    while current_turn < max_turns:
+        current_turn += 1
+        try:
+            response = call_grok_api(conversation_history)
+        except Exception as e:
+            print(f"{RED}[Error calling Grok]: {e}{RESET}")
+            return
 
-    choice = response["choices"][0]
-    message = choice["message"]
-    conversation_history.append(message)
+        choice = response["choices"][0]
+        message = choice["message"]
+        conversation_history.append(message)
 
-    # Check if Grok wants to call MCP tools
-    tool_calls = message.get("tool_calls", [])
-    if tool_calls:
+        tool_calls = message.get("tool_calls", [])
+        if not tool_calls:
+            # Final text response from Grok
+            content = message.get("content", "")
+            print(f"\n{BOLD}{CYAN}Grok Assistant:{RESET} {content}")
+            break
+
+        # Process each tool call requested by Grok
         for tool_call in tool_calls:
-            t_id = tool_call.get("id", "call_1")
+            t_id = tool_call.get("id", f"call_{current_turn}")
             fn = tool_call.get("function", {})
             t_name = fn.get("name")
             try:
@@ -325,19 +333,7 @@ def run_agent_turn(user_prompt, conversation_history):
                 "content": json.dumps(tool_result)
             })
 
-        # Get final response from Grok after tool execution
-        print(f"\n{DIM}[*] Getting final response from Grok...{RESET}")
-        try:
-            final_resp = call_grok_api(conversation_history)
-            final_content = final_resp["choices"][0]["message"].get("content", "")
-            print(f"\n{BOLD}{CYAN}Grok Assistant:{RESET} {final_content}")
-            conversation_history.append(final_resp["choices"][0]["message"])
-        except Exception as e:
-            print(f"{RED}[Error getting final response]: {e}{RESET}")
-    else:
-        # Normal text response
-        content = message.get("content", "")
-        print(f"\n{BOLD}{CYAN}Grok Assistant:{RESET} {content}")
+        print(f"\n{DIM}[*] Grok evaluating tool output (Step {current_turn})...{RESET}")
 
 def run_simulation_demonstration():
     """Runs the indirect prompt injection attack simulation (works offline without API key)"""
