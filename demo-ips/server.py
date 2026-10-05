@@ -8,7 +8,7 @@ import json
 import os
 
 import sys
-
+import subprocess
 import threading
 
 import time
@@ -525,18 +525,61 @@ class SecureMCPHandler(BaseHTTPRequestHandler):
 
             
 
-            # Normal execution response
-            exec_output = "Execution completed safely."
+            # MCP Tool Execution
+            exec_output = "Execution completed."
+            base_project_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
             if tool == "read_file":
                 filepath = params.get("arguments", {}).get("path", "")
-                if filepath and os.path.exists(filepath):
-                    try:
-                        with open(filepath, 'r') as f:
-                            exec_output = f.read()
-                    except Exception as e:
-                        exec_output = f"Error reading file: {e}"
-                else:
+                candidates = [
+                    filepath,
+                    os.path.join(base_project_dir, filepath),
+                    os.path.join(base_project_dir, 'demo-indirect-injection', filepath),
+                    os.path.join(base_project_dir, 'demo-indirect-injection', 'public_repo', os.path.basename(filepath))
+                ]
+                found = False
+                for c in candidates:
+                    if os.path.exists(c) and os.path.isfile(c):
+                        try:
+                            with open(c, 'r') as f:
+                                exec_output = f.read()
+                            found = True
+                            break
+                        except Exception as e:
+                            exec_output = f"Error reading file: {e}"
+                            found = True
+                            break
+                if not found:
                     exec_output = f"File not found: {filepath}"
+            elif tool == "execute_command":
+                cmd = params.get("arguments", {}).get("cmd", "")
+                try:
+                    res = subprocess.run(
+                        cmd,
+                        shell=True,
+                        capture_output=True,
+                        text=True,
+                        timeout=10,
+                        cwd=base_project_dir
+                    )
+                    exec_output = res.stdout if res.stdout else res.stderr
+                    if not exec_output:
+                        exec_output = f"(Command exited with code {res.returncode})"
+                except subprocess.TimeoutExpired:
+                    exec_output = "Error: Command timed out after 10 seconds"
+                except Exception as e:
+                    exec_output = f"Error executing command: {e}"
+            elif tool == "ping":
+                host = params.get("arguments", {}).get("host", "127.0.0.1")
+                try:
+                    res = subprocess.run(
+                        ["ping", "-c", "2", "-W", "2", host],
+                        capture_output=True,
+                        text=True,
+                        timeout=5
+                    )
+                    exec_output = res.stdout if res.stdout else res.stderr
+                except Exception as e:
+                    exec_output = f"Error running ping: {e}"
 
             response = {
                 "jsonrpc": "2.0",
