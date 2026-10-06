@@ -1,0 +1,41 @@
+
+[
+
+    {
+
+        "id": "SAFE01",
+
+        "tool": "ping",
+
+        "payload": {"host": "127.0.0.1"},
+
+        "expected": "clean"
+
+    },
+
+    {
+
+        "id": "SAFE02",
+
+        "tool": "search",
+
+        "payload": {"query": "python eBPF tutorial"},
+
+        "expected": "clean"
+
+    },
+
+    {
+
+        "id": "SAFE03",
+
+        "tool": "read_file",
+
+        "payload": {"path": "/var/log/syslog"},
+
+        "expected": "clean"
+
+    }
+
+]
+
