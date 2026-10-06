@@ -21,10 +21,16 @@ from collections import defaultdict, deque
 # Import authentication
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'module3-policy'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'module4-semantic'))
 
 from auth import get_auth_manager
-
 from audit_logger import get_audit_logger
+from engine import PolicyAdapter
+from inspector import ThreatDetector
+
+policy_file = os.path.join(os.path.dirname(__file__), '..', 'module3-policy', 'policy.json')
+policy_adapter = PolicyAdapter(policy_file)
+threat_detector = ThreatDetector()
 
 
 
@@ -525,6 +531,28 @@ class SecureMCPHandler(BaseHTTPRequestHandler):
             stats = rate_limiter.get_stats(client_ip)
 
             
+
+            # TrueIntent Active Defense Policy & Semantic Check
+            tool_args = params.get("arguments", {})
+            pol_action, pol_reason = policy_adapter.evaluate_tool_call(tool, tool_args)
+            sem_decision, sem_reason, sem_details = threat_detector.check_arguments(tool_args)
+
+            if pol_action == "block" or sem_decision == "flag":
+                block_reason = pol_reason if pol_action == "block" else f"Threat detected: {sem_reason}"
+                audit_logger.log_threat_detected(client_ip, "active_defense", {"reason": block_reason, "details": sem_details}, request_id=req_id)
+                sys.stderr.write(f"\n[🚨 TRUEINTENT BLOCKED] {client_ip} - Tool '{tool}' - {block_reason}\n")
+                sys.stderr.flush()
+                resp_bytes = json.dumps({
+                    "jsonrpc": "2.0",
+                    "id": req_id,
+                    "error": {"code": -32000, "message": f"CRITICAL: Blocked by TrueIntent eBPF IPS Enforcement ({block_reason})"}
+                }).encode('utf-8')
+                self.send_response(403)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('Content-Length', str(len(resp_bytes)))
+                self.end_headers()
+                self.wfile.write(resp_bytes)
+                return
 
             # MCP Tool Execution
             exec_output = "Execution completed."
