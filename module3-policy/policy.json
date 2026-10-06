@@ -14,6 +14,19 @@
         }
       }
     },
+    "get_github_issue": {
+      "action": "allow",
+      "description": "Fetch public repository issue for inspection",
+      "allowed_arguments": {
+        "repo": {
+          "type": "string",
+          "max_length": 500
+        },
+        "issue_number": {
+          "type": "integer"
+        }
+      }
+    },
     "read_file": {
       "action": "allow",
       "description": "Read files from workspace only",

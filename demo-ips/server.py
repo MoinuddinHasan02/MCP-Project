@@ -10,6 +10,7 @@ import os
 import sys
 import subprocess
 import threading
+import urllib.request
 
 import time
 
@@ -580,6 +581,43 @@ class SecureMCPHandler(BaseHTTPRequestHandler):
                     exec_output = res.stdout if res.stdout else res.stderr
                 except Exception as e:
                     exec_output = f"Error running ping: {e}"
+            elif tool == "get_github_issue":
+                repo = str(params.get("arguments", {}).get("repo", "")).strip()
+                issue_number = params.get("arguments", {}).get("issue_number", 42)
+                # Clean URL prefix if user passes full link like https://github.com/owner/repo
+                repo_clean = repo.replace("https://github.com/", "").replace("http://github.com/", "").strip("/")
+                # Check local mock repositories (e.g. attacker/public-repo or public_repo)
+                mock_issue_path = os.path.join(base_project_dir, 'demo-indirect-injection', 'public_repo', f'issue_{issue_number}.json')
+                if ('attacker' in repo_clean or 'public' in repo_clean) and os.path.exists(mock_issue_path):
+                    try:
+                        with open(mock_issue_path, 'r') as f:
+                            exec_output = f.read()
+                    except Exception as e:
+                        exec_output = f"Error reading mock issue: {e}"
+                else:
+                    # Attempt fetching live public GitHub issue via GitHub API
+                    try:
+                        api_url = f"https://api.github.com/repos/{repo_clean}/issues/{issue_number}"
+                        gh_req = urllib.request.Request(
+                            api_url,
+                            headers={"User-Agent": "TrueIntent-MCP-Client/1.0", "Accept": "application/vnd.github.v3+json"}
+                        )
+                        with urllib.request.urlopen(gh_req, timeout=8) as gh_resp:
+                            issue_json = json.loads(gh_resp.read().decode('utf-8'))
+                            exec_output = json.dumps({
+                                "id": issue_json.get("number"),
+                                "repo": repo_clean,
+                                "title": issue_json.get("title"),
+                                "author": issue_json.get("user", {}).get("login"),
+                                "state": issue_json.get("state"),
+                                "body": issue_json.get("body")
+                            }, indent=2)
+                    except Exception as e:
+                        if os.path.exists(mock_issue_path):
+                            with open(mock_issue_path, 'r') as f:
+                                exec_output = f.read()
+                        else:
+                            exec_output = f"Error: Could not fetch issue #{issue_number} from GitHub repository '{repo_clean}': {e}"
 
             response = {
                 "jsonrpc": "2.0",
