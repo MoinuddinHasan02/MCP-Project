@@ -1,9 +1,9 @@
 Type,Test_ID,Tool,Outcome,Latency_ms
-Attack,A01,execute_command,CAUGHT,314.51ms
-Attack,A02,execute_command,CAUGHT,182.99ms
-Attack,A03,read_file,CAUGHT,151.80ms
-Attack,A04,fetch_url,BYPASSED,156.42ms
-Attack,B01,execute_command,CAUGHT,208.16ms
-Benign,SAFE01,ping,CLEAN,300.13ms
-Benign,SAFE02,search,CLEAN,326.10ms
-Benign,SAFE03,read_file,CLEAN,462.95ms
+Attack,A01,execute_command,CAUGHT,214.32ms
+Attack,A02,execute_command,CAUGHT,197.37ms
+Attack,A03,read_file,CAUGHT,204.48ms
+Attack,A04,fetch_url,BYPASSED,289.54ms
+Attack,B01,execute_command,CAUGHT,367.56ms
+Benign,SAFE01,ping,CLEAN,286.37ms
+Benign,SAFE02,search,CLEAN,210.36ms
+Benign,SAFE03,read_file,CLEAN,196.12ms

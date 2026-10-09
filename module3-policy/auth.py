@@ -28,7 +28,12 @@ class AuthManager:
             config_path: Path to auth configuration file
         """
         if config_path is None:
-            config_path = Path.home() / ".trueintent" / "auth.json"
+            if "TRUEINTENT_AUTH_CONFIG" in os.environ:
+                config_path = Path(os.environ["TRUEINTENT_AUTH_CONFIG"])
+            elif "SUDO_USER" in os.environ and Path(f"/home/{os.environ['SUDO_USER']}/.trueintent/auth.json").exists():
+                config_path = Path(f"/home/{os.environ['SUDO_USER']}/.trueintent/auth.json")
+            else:
+                config_path = Path.home() / ".trueintent" / "auth.json"
         
         self.config_path = Path(config_path)
         self.config = self._load_or_create_config()

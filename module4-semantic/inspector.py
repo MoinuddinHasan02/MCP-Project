@@ -150,7 +150,7 @@ class ThreatDetector:
             (r'pkexec\b', 'PolicyKit privilege escalation'),
             
             # Destructive operations
-            (r'rm\s+(-rf|-fr|-r|-f)\s*/', 'Destructive file deletion'),
+            (r'rm\s+(-rf|-fr|-r|-f)(\s+|$)', 'Destructive file deletion'),
             (r'mkfs\b', 'Filesystem formatting'),
             (r'dd\s+if=', 'Direct disk access'),
             (r'shred\b', 'Secure file deletion'),

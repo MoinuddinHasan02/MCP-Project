@@ -95,18 +95,21 @@ class SecureTempManager:
         """
         with self.lock:
             if not hasattr(self, '_log_file_path'):
-                # Create persistent log file
-                fd, path = tempfile.mkstemp(
-                    suffix=".log",
-                    prefix=f"{self.prefix}ebpf_stream_",
-                    dir=None
-                )
-                os.chmod(path, 0o600)
-                os.close(fd)
-                
-                self._log_file_path = path
-                self.temp_files.append(path)
-            
+                log_dir = Path.home() / ".trueintent"
+                log_dir.mkdir(parents=True, exist_ok=True)
+                try:
+                    os.chmod(str(log_dir), 0o700)
+                except Exception:
+                    pass
+                log_file = log_dir / "ebpf_stream.log"
+                if not log_file.exists():
+                    log_file.touch(mode=0o600, exist_ok=True)
+                else:
+                    try:
+                        os.chmod(str(log_file), 0o600)
+                    except Exception:
+                        pass
+                self._log_file_path = str(log_file)
             return self._log_file_path
     
     def cleanup_file(self, path):

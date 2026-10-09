@@ -119,6 +119,23 @@ class MCPParser:
                     else:
                         buffer = buffer[1:]
                 except json.JSONDecodeError:
+                    # Check if fixing non-standard \x hex escapes allows decoding
+                    sanitized = re.sub(r'(?<!\\)\\x([0-9a-fA-F]{2})', r'\\\\x\1', buffer)
+                    if sanitized != buffer:
+                        try:
+                            obj, idx = self.decoder.raw_decode(sanitized)
+                            if isinstance(obj, dict):
+                                if "params" in obj and isinstance(obj["params"], dict) and "arguments" in obj["params"]:
+                                    args = obj["params"]["arguments"]
+                                    if isinstance(args, dict):
+                                        for k, v in args.items():
+                                            if isinstance(v, str):
+                                                args[k] = self.deobfuscator.analyze(v)
+                                messages.append(self._format_message(obj, event, key))
+                                buffer = sanitized[idx:]
+                                continue
+                        except json.JSONDecodeError:
+                            pass
                     # Incomplete JSON message; wait for the next chunk
                     break
             else:

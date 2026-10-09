@@ -38,11 +38,15 @@ def run_agent(input_file):
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
 
+    API_KEY = os.environ.get("MCP_API_KEY", "qucHMIbXHvj5JiVjPYSpkotBtDJeOe9e5OzreZPfrZE")
     print(f"[*] Dispatching encrypted MCP request to {url}...")
     req = urllib.request.Request(
         url,
         data=json.dumps(mcp_request).encode('utf-8'),
-        headers={"Content-Type": "application/json"}
+        headers={
+            "Content-Type": "application/json",
+            "X-API-Key": API_KEY
+        }
     )
     
     try:

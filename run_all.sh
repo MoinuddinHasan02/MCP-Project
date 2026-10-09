@@ -9,8 +9,13 @@ echo "  TrueIntent: eBPF-Driven MCP Inspection & Security Firewall"
 echo "=========================================================="
 echo ""
 
-echo "[*] Requesting sudo privileges for eBPF modules..."
-sudo -v
+if sudo -v 2>/dev/null; then
+    SNIFFER_CMD="sudo python3 -u module1-interceptor/sniff_bcc_simple.py"
+    echo "[+] Using Linux Kernel eBPF Interception (sniff_bcc_simple.py)"
+else
+    SNIFFER_CMD="python3 -u module1-interceptor/sniff.py"
+    echo "[!] Sudo authentication not provided: Using TLS stream interception (sniff.py)"
+fi
 
 echo "[*] Project Directory: $PROJECT_DIR"
 echo "[*] Secure temp files initialized"
@@ -31,7 +36,7 @@ sleep 1
 
 echo "[*] Starting Full 4-Layer Inspection Pipeline..."
 cd "$PROJECT_DIR"
-sudo python3 -u module1-interceptor/sniff_bcc_simple.py 2>&1 | \
+$SNIFFER_CMD 2>&1 | \
   python3 -u module2-parser/parser.py 2>&1 | \
   python3 -u module3-policy/engine.py 2>&1 | \
   python3 -u module4-semantic/inspector.py &

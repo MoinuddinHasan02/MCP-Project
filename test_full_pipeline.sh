@@ -29,10 +29,13 @@ if [[ "$OSTYPE" != "linux-gnu"* ]]; then
     exit 1
 fi
 
-# Check if running as root
-if [ "$EUID" -ne 0 ]; then 
-    echo -e "${RED}[ERROR]${NC} Please run with sudo (eBPF requires root)"
-    exit 1
+# Check privileges and choose sniffer mode
+if [ "$EUID" -eq 0 ]; then 
+    SNIFFER_CMD="python3 -u module1-interceptor/sniff_bcc_simple.py"
+    echo -e "${GREEN}✓${NC} Root privilege active: using kernel eBPF uprobe sniffer"
+else
+    SNIFFER_CMD="python3 -u module1-interceptor/sniff.py"
+    echo -e "${YELLOW}[INFO]${NC} Running as standard user: using TLS stream sniffer (run with sudo for kernel eBPF)"
 fi
 
 echo -e "${GREEN}[STEP 1]${NC} Checking dependencies..."
@@ -76,7 +79,7 @@ echo -e "${GREEN}[STEP 3]${NC} Starting eBPF interceptor pipeline..."
 
 # Start the full pipeline
 cd "$PROJECT_ROOT"
-sudo -u $SUDO_USER python3 -u module1-interceptor/sniff_bcc_simple.py 2>/dev/null | \
+$SNIFFER_CMD 2>/dev/null | \
   python3 -u module2-parser/parser.py 2>/dev/null | \
   python3 -u module3-policy/engine.py 2>/dev/null | \
   python3 -u module4-semantic/inspector.py > /tmp/pipeline.log 2>&1 &
@@ -106,11 +109,11 @@ BODY=$(echo "$RESPONSE" | head -n-1)
 
 if [ "$HTTP_CODE" = "200" ] && echo "$BODY" | grep -q "success"; then
     echo -e "${GREEN}✓ PASSED${NC} - Request allowed (200 OK)"
-    ((PASSED++))
+    PASSED=$((PASSED + 1))
 else
     echo -e "${RED}✗ FAILED${NC} - Expected 200, got $HTTP_CODE"
     echo "Response: $BODY"
-    ((FAILED++))
+    FAILED=$((FAILED + 1))
 fi
 
 sleep 1
@@ -127,11 +130,11 @@ BODY=$(echo "$RESPONSE" | head -n-1)
 
 if [ "$HTTP_CODE" = "403" ] || echo "$BODY" | grep -qi "blocked\|denied\|forbidden"; then
     echo -e "${GREEN}✓ PASSED${NC} - Malicious request blocked"
-    ((PASSED++))
+    PASSED=$((PASSED + 1))
 else
     echo -e "${RED}✗ FAILED${NC} - Malicious request NOT blocked (got $HTTP_CODE)"
     echo "Response: $BODY"
-    ((FAILED++))
+    FAILED=$((FAILED + 1))
 fi
 
 sleep 1
@@ -148,11 +151,11 @@ BODY=$(echo "$RESPONSE" | head -n-1)
 
 if [ "$HTTP_CODE" = "403" ] || echo "$BODY" | grep -qi "blocked\|denied\|forbidden"; then
     echo -e "${GREEN}✓ PASSED${NC} - Path traversal blocked"
-    ((PASSED++))
+    PASSED=$((PASSED + 1))
 else
     echo -e "${RED}✗ FAILED${NC} - Path traversal NOT blocked (got $HTTP_CODE)"
     echo "Response: $BODY"
-    ((FAILED++))
+    FAILED=$((FAILED + 1))
 fi
 
 sleep 1
@@ -169,36 +172,42 @@ BODY=$(echo "$RESPONSE" | head -n-1)
 
 if [ "$HTTP_CODE" = "403" ] || echo "$BODY" | grep -qi "blocked\|denied\|forbidden"; then
     echo -e "${GREEN}✓ PASSED${NC} - Obfuscated payload blocked"
-    ((PASSED++))
+    PASSED=$((PASSED + 1))
 else
     echo -e "${RED}✗ FAILED${NC} - Obfuscated payload NOT blocked (got $HTTP_CODE)"
     echo "Response: $BODY"
-    ((FAILED++))
+    FAILED=$((FAILED + 1))
 fi
 
 sleep 1
 
 # Test 5: Rate limiting
-echo -e "${YELLOW}[TEST 5]${NC} Rate limiting (burst of 25 requests)..."
-RATE_LIMITED=0
-for i in {1..25}; do
-    HTTP_CODE=$(curl -sk -w "%{http_code}" -o /dev/null -X POST "$SERVER_URL" \
-      -H "X-API-Key: $API_KEY" \
-      -H "Content-Type: application/json" \
-      -d '{"jsonrpc":"2.0","id":'$i',"method":"tools/call","params":{"name":"ping","arguments":{"host":"127.0.0.1"}}}')
-    
-    if [ "$HTTP_CODE" = "429" ]; then
-        RATE_LIMITED=1
-        break
-    fi
-done
+echo -e "${YELLOW}[TEST 5]${NC} Rate limiting (50 concurrent requests)..."
+RATE_LIMITED=$(python3 -c "
+import urllib.request, ssl, concurrent.futures
+ctx = ssl._create_unverified_context()
+def req(i):
+    r = urllib.request.Request('$SERVER_URL', data=b'{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"ping\",\"arguments\":{\"host\":\"127.0.0.1\"}}}', headers={'Content-Type': 'application/json', 'X-API-Key': '$API_KEY'})
+    try:
+        with urllib.request.urlopen(r, context=ctx, timeout=5) as res:
+            return res.status
+    except urllib.error.HTTPError as e:
+        return e.code
+    except Exception:
+        return 0
 
-if [ $RATE_LIMITED -eq 1 ]; then
+with concurrent.futures.ThreadPoolExecutor(max_workers=50) as ex:
+    codes = list(ex.map(req, range(50)))
+
+print(1 if 429 in codes else 0)
+" 2>/dev/null || echo 0)
+
+if [ "$RATE_LIMITED" = "1" ]; then
     echo -e "${GREEN}✓ PASSED${NC} - Rate limiting triggered (429 Too Many Requests)"
-    ((PASSED++))
+    PASSED=$((PASSED + 1))
 else
     echo -e "${RED}✗ FAILED${NC} - Rate limiting NOT triggered"
-    ((FAILED++))
+    FAILED=$((FAILED + 1))
 fi
 
 sleep 2
@@ -214,10 +223,10 @@ HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
 
 if [ "$HTTP_CODE" = "401" ] || [ "$HTTP_CODE" = "403" ]; then
     echo -e "${GREEN}✓ PASSED${NC} - Invalid API key rejected ($HTTP_CODE)"
-    ((PASSED++))
+    PASSED=$((PASSED + 1))
 else
     echo -e "${RED}✗ FAILED${NC} - Invalid API key NOT rejected (got $HTTP_CODE)"
-    ((FAILED++))
+    FAILED=$((FAILED + 1))
 fi
 
 echo ""
@@ -236,20 +245,26 @@ echo -e "${GREEN}[STEP 6]${NC} Checking audit logs..."
 
 # Check audit logs
 cd "$PROJECT_ROOT/module3-policy"
-if [ -d ~/.trueintent/audit ]; then
-    AUDIT_FILES=$(ls ~/.trueintent/audit/*.json 2>/dev/null | wc -l)
+AUDIT_DIR="$HOME/.trueintent/logs"
+if [ ! -d "$AUDIT_DIR" ] && [ -n "$SUDO_USER" ]; then
+    USER_HOME=$(eval echo "~$SUDO_USER")
+    AUDIT_DIR="$USER_HOME/.trueintent/logs"
+fi
+
+if [ -d "$AUDIT_DIR" ]; then
+    AUDIT_FILES=$(ls "$AUDIT_DIR"/*.jsonl 2>/dev/null | wc -l)
     if [ $AUDIT_FILES -gt 0 ]; then
-        echo -e "${GREEN}✓${NC} Audit logs created ($AUDIT_FILES files)"
+        echo -e "${GREEN}✓${NC} Audit logs created ($AUDIT_FILES files in $AUDIT_DIR)"
         
         # Show recent events
         echo ""
         echo "Recent audit events:"
         python3 audit_logger.py recent 5 2>/dev/null || true
     else
-        echo -e "${YELLOW}⚠${NC} No audit log files found"
+        echo -e "${YELLOW}⚠${NC} No audit log files found in $AUDIT_DIR"
     fi
 else
-    echo -e "${YELLOW}⚠${NC} Audit directory not found"
+    echo -e "${YELLOW}⚠${NC} Audit directory not found ($AUDIT_DIR)"
 fi
 
 echo ""

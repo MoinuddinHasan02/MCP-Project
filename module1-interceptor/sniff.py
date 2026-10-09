@@ -9,6 +9,9 @@ sys.stderr.write(f"[SYSTEM] TrueIntent eBPF engine listening on libssl.so...\n")
 sys.stderr.write(f"[SYSTEM] Using secure log file: {LOG}\n")
 sys.stderr.flush()
 
+if not os.path.exists(LOG):
+    open(LOG, 'a').close()
+
 with open(LOG, 'r') as f:
     f.seek(0, os.SEEK_END)
     while True:

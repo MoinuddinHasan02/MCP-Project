@@ -263,6 +263,43 @@ class DashboardServer(http.server.BaseHTTPRequestHandler):
                 except:
                     break
 
+    def do_POST(self):
+        if self.path == "/events":
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8')
+            try:
+                ev = json.loads(body)
+                is_blocked = (ev.get("policy_decision") == "block" or ev.get("semantic_decision") == "flag")
+                action = "IPS BLOCKED" if is_blocked else "ALLOWED"
+                tool = ev.get("tool_name") or ev.get("mcp_payload", {}).get("params", {}).get("name", "tool")
+                detail = ev.get("semantic_reason") if ev.get("semantic_decision") == "flag" else (ev.get("policy_reason") or "Clean execution")
+                
+                METRICS["inspected"] += 1
+                if is_blocked:
+                    METRICS["blocked"] += 1
+                else:
+                    METRICS["passed"] += 1
+
+                EVENTS.append({
+                    "time": time.strftime("%H:%M:%S"),
+                    "action": action,
+                    "tool": tool,
+                    "detail": str(detail)
+                })
+
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(b'{"status":"ok"}')
+            except Exception as e:
+                self.send_response(400)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"error": str(e)}).encode())
+        else:
+            self.send_response(404)
+            self.end_headers()
+
     def run_simulation(self, sim_type):
         base_dir = os.path.dirname(os.path.abspath(__file__))
         agent_path = os.path.join(base_dir, "agent.py")

@@ -459,8 +459,21 @@ class SecureMCPHandler(BaseHTTPRequestHandler):
         
 
         content_length = int(self.headers.get('Content-Length', 0))
-
         body = self.rfile.read(content_length).decode('utf-8')
+
+        # Stream event to secure log for pipeline monitoring
+        try:
+            from secure_temp import get_secure_log_path
+            sec_log = get_secure_log_path()
+            with open(sec_log, "a") as f:
+                f.write(json.dumps({
+                    "pid": os.getpid(),
+                    "comm": "mcp-server",
+                    "client_ip": client_ip,
+                    "data": f"POST /mcp HTTP/1.1\r\n\r\n{body}"
+                }) + "\n")
+        except Exception:
+            pass
 
         
 

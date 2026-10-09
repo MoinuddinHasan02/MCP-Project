@@ -23,30 +23,23 @@ ssl_context = ssl._create_unverified_context()
 
 
 
+API_KEY = "qucHMIbXHvj5JiVjPYSpkotBtDJeOe9e5OzreZPfrZE"
+
 def send_request(req_id):
-
     payload = json.dumps({
-
         "jsonrpc": "2.0",
-
         "id": req_id,
-
         "method": "tools/call",
-
-        "params": {"name": "ping", "arguments": {"seq": req_id}}
-
+        "params": {"name": "ping", "arguments": {"host": "127.0.0.1", "seq": req_id}}
     }).encode("utf-8")
 
-    
-
     req = urllib.request.Request(
-
         TARGET_URL,
-
         data=payload,
-
-        headers={"Content-Type": "application/json"}
-
+        headers={
+            "Content-Type": "application/json",
+            "X-API-Key": API_KEY
+        }
     )
 
     
