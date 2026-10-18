@@ -26,3 +26,6 @@ env/
 *.env
 .env
 
+# Agent artifacts
+.agents/
+

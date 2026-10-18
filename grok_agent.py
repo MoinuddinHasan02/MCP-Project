@@ -17,6 +17,19 @@ import ssl
 import time
 import urllib.request
 import urllib.error
+import requests
+
+# Persistent HTTP session with connection pooling for ultra-low latency (<300ms)
+_llm_session = None
+
+def get_llm_session():
+    global _llm_session
+    if _llm_session is None:
+        _llm_session = requests.Session()
+        adapter = requests.adapters.HTTPAdapter(pool_connections=10, pool_maxsize=10, max_retries=1)
+        _llm_session.mount("https://", adapter)
+        _llm_session.mount("http://", adapter)
+    return _llm_session
 
 # Project paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -72,8 +85,14 @@ def load_env_file(filepath):
 ENV_FILE = os.path.join(BASE_DIR, 'env', '.env')
 env_config = load_env_file(ENV_FILE)
 GROK_API_KEY = env_config.get('grokapi') or env_config.get('GROK_API_KEY') or os.environ.get('GROK_API_KEY', '')
-GROK_BASE_URL = env_config.get('GROK_BASE_URL', 'https://api.x.ai/v1')
-GROK_MODEL = env_config.get('GROK_MODEL', 'grok-2-latest')
+GROK_BASE_URL = env_config.get('GROK_BASE_URL', 'https://api.groq.com/openai/v1')
+GROK_MODEL = env_config.get('GROK_MODEL', 'qwen/qwen3.8-27b')
+
+def set_grok_model(new_model):
+    """Dynamically switch model engine at runtime"""
+    global GROK_MODEL
+    GROK_MODEL = new_model
+    return GROK_MODEL
 
 # OpenAI-compatible OpenAPI Tool Definitions for Grok
 MCP_TOOLS_SPEC = [
@@ -151,18 +170,16 @@ MCP_TOOLS_SPEC = [
     }
 ]
 
-SYSTEM_PROMPT = """You are an intelligent AI assistant integrated with a local Model Context Protocol (MCP) server.
-You have access to tools via the standard MCP interface:
-1. 'get_github_issue': Fetch an issue from a public repository provided by the user.
-2. 'read_file': Read files from the workspace.
-3. 'execute_command': Execute bash/terminal commands on the host system (e.g. ls, df, free, git status, cat, etc.).
-4. 'ping': Test network latency/connectivity to a host.
+SYSTEM_PROMPT = """You are an intelligent AI developer assistant integrated with a local Model Context Protocol (MCP) server.
+You have access to the following tools via the standard MCP interface:
+1. 'read_file': Read files from the workspace or repository.
+2. 'execute_command': Execute bash/terminal commands on the host system.
+3. 'get_github_issue': Fetch and inspect an issue from a public repository.
+4. 'ping': Test network reachability and latency to a host.
 
 Guidelines:
-- When a user asks you to summarize or read an issue from a repository:
-  If the user has NOT provided the repository link or name, do NOT guess. Ask the user for the repository URL or 'owner/repo' name.
-  Once the user provides the repository link or name, invoke 'get_github_issue' with the repository and issue number.
-- When a user asks you to run a terminal command or inspect local files, invoke the appropriate MCP tool ('execute_command', 'read_file')."""
+- When a user asks you to inspect a file, check connectivity, read a repository issue, or run a diagnostic command, formulate and call the appropriate MCP tool.
+- Always provide helpful, accurate, and concise responses."""
 
 def execute_mcp_tool_through_firewall(tool_name, arguments, user_prompt=None):
     """
@@ -278,50 +295,56 @@ def execute_mcp_tool_through_firewall(tool_name, arguments, user_prompt=None):
         print(f"  {RED}⚠ Connection Error to MCP server: {e}{RESET}")
         return {"error": str(e)}
 
-def call_grok_api(messages):
-    """Calls xAI Grok API using OpenAI-compatible chat completion endpoint"""
+def call_grok_api(messages, model=None, temperature=0.0, max_tokens=512):
+    """
+    Calls the OpenAI-compatible LLM endpoint (Groq LPU or xAI Grok).
+    Uses a persistent HTTP session with connection pooling, temperature=0.0,
+    and token bounding to ensure ultra-low latency (<300ms on Groq).
+    """
+    target_model = model or GROK_MODEL
     url = f"{GROK_BASE_URL.rstrip('/')}/chat/completions"
     
     payload = {
-        "model": GROK_MODEL,
+        "model": target_model,
         "messages": messages,
         "tools": MCP_TOOLS_SPEC,
         "tool_choice": "auto",
-        "temperature": 0.2
+        "temperature": temperature,
+        "max_tokens": max_tokens
     }
 
-    req = urllib.request.Request(
-        url,
-        data=json.dumps(payload).encode('utf-8'),
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {GROK_API_KEY}",
-            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        }
-    )
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {GROK_API_KEY}",
+        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 TrueIntent/2.0"
+    }
 
+    session = get_llm_session()
     try:
-        with urllib.request.urlopen(req, timeout=30) as response:
-            return json.loads(response.read().decode('utf-8'))
-    except urllib.error.HTTPError as e:
-        err_msg = e.read().decode('utf-8', errors='ignore') if e.fp else str(e)
-        raise RuntimeError(f"Grok API Error (HTTP {e.code}): {err_msg}")
-    except Exception as e:
-        raise RuntimeError(f"Network error calling Grok API: {e}")
+        resp = session.post(url, json=payload, headers=headers, timeout=20)
+        if resp.status_code == 200:
+            return resp.json()
+        else:
+            raise RuntimeError(f"LLM API Error (HTTP {resp.status_code}): {resp.text}")
+    except requests.exceptions.RequestException as e:
+        raise RuntimeError(f"Network error calling LLM API: {e}")
 
 def run_agent_turn(user_prompt, conversation_history, max_turns=5):
-    """Processes a user prompt through Grok and iteratively handles tool calls"""
+    """Processes a user prompt through Grok and iteratively handles tool calls with instant short-circuiting on security blocks"""
     conversation_history.append({"role": "user", "content": user_prompt})
     print(f"\n{BOLD}{GREEN}User:{RESET} {user_prompt}")
-    print(f"{DIM}[*] Sending prompt to Grok ({GROK_MODEL})...{RESET}")
+    print(f"{DIM}[*] Sending prompt to LLM ({GROK_MODEL}) with connection-pooled fast path...{RESET}")
 
     current_turn = 0
     while current_turn < max_turns:
         current_turn += 1
         try:
+            t0 = time.time()
             response = call_grok_api(conversation_history)
+            llm_latency = (time.time() - t0) * 1000
+            print(f"{DIM}[*] LLM response received in {llm_latency:.1f}ms{RESET}")
         except Exception as e:
-            print(f"{RED}[Error calling Grok]: {e}{RESET}")
+            print(f"{RED}[Error calling Grok/LLM]: {e}{RESET}")
             return
 
         choice = response["choices"][0]
@@ -336,6 +359,7 @@ def run_agent_turn(user_prompt, conversation_history, max_turns=5):
             break
 
         # Process each tool call requested by Grok
+        has_blocked_tool = False
         for tool_call in tool_calls:
             t_id = tool_call.get("id", f"call_{current_turn}")
             fn = tool_call.get("function", {})
@@ -347,6 +371,8 @@ def run_agent_turn(user_prompt, conversation_history, max_turns=5):
 
             # Execute tool through TrueIntent
             tool_result = execute_mcp_tool_through_firewall(t_name, t_args, user_prompt=user_prompt)
+            if tool_result.get("blocked"):
+                has_blocked_tool = True
 
             # Send tool result back to Grok
             conversation_history.append({
@@ -355,6 +381,11 @@ def run_agent_turn(user_prompt, conversation_history, max_turns=5):
                 "name": t_name,
                 "content": json.dumps(tool_result)
             })
+
+        if has_blocked_tool:
+            print(f"\n{BOLD}{RED}🛡️ TrueIntent Firewall intercepted and dropped malicious tool call at kernel boundary.{RESET}")
+            print(f"{BOLD}{GREEN}✓ Security violation halted immediately. Terminating agent execution loop.{RESET}\n")
+            break
 
         print(f"\n{DIM}[*] Grok evaluating tool output (Step {current_turn})...{RESET}")
 
