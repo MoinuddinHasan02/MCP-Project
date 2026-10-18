@@ -211,10 +211,15 @@ class ThreatDetector:
             (r'/etc/cron', 'Cron directory access'),
             (r'systemctl\s+(enable|start)', 'Service manipulation'),
             
-            # Data exfiltration
+            # Data exfiltration & unauthorized egress
             (r'(curl|wget).*http://\d+\.\d+\.\d+\.\d+', 'HTTP to IP address'),
             (r'\b(curl|wget)\b.*(-d|-F|--data|--upload-file|@)', 'Data exfiltration attempt via HTTP POST'),
             (r'\b(curl|wget)\b.*https?://', 'External HTTP data transfer attempt'),
+            (r'https?://.*(exfil|leak|token|credential|staged|evil|c2|upload|data=|key=|\$FILE|anothermachine)', 'Unauthorized data exfiltration via external URL or destination'),
+            (r'https?://(attacker|c2\.|evil|malicious|pwned|example\.com/upload)', 'Untrusted or adversarial external destination'),
+            (r'\b(pbpaste|xsel|GetClipboardData|pyperclip)\b', 'Clipboard snooping and exfiltration'),
+            (r'\b(pyautogui|gnome-screenshot|screencapture|x11grab)\b', 'Screen scraping telemetry exfiltration'),
+            (r'(\||;|\&)\s*id\s*(\||;|\&|$)', 'Command chaining with identity probe (id)'),
             (r'(\bGITHUB_TOKEN\b|\bGH_TOKEN\b|\.env\b)', 'Sensitive token or environment credential access'),
             (r'\bgh\s+(pr|repo|api)\b', 'Unauthorized GitHub CLI operation'),
             (r'scp\s+.*@', 'Secure copy to remote'),

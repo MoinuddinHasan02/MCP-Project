@@ -3,8 +3,10 @@ import os
 import subprocess
 import time
 import csv
+import argparse
 
-ATTACK_CORPUS = os.path.join(os.path.dirname(__file__), "../module6-adversarial/attack_corpus.json")
+DEFAULT_ATTACK_CORPUS = os.path.join(os.path.dirname(__file__), "../module6-adversarial/attack_suite/unified_attack_corpus.json")
+FALLBACK_ATTACK_CORPUS = os.path.join(os.path.dirname(__file__), "../module6-adversarial/attack_corpus.json")
 BENIGN_CORPUS = os.path.join(os.path.dirname(__file__), "benign_corpus.json")
 INSPECTOR_PATH = os.path.join(os.path.dirname(__file__), "../module4-semantic/inspector.py")
 RESULTS_CSV = os.path.join(os.path.dirname(__file__), "evaluation_results.csv")
@@ -33,11 +35,23 @@ def evaluate_payload(tool, payload):
     return res.get("semantic_decision", "error"), latency
 
 def main():
+    parser = argparse.ArgumentParser(description="TrueIntent Security Evaluation Harness")
+    parser.add_argument("--corpus", type=str, default=None, help="Path to attack corpus JSON")
+    args = parser.parse_args()
+
+    if args.corpus and os.path.exists(args.corpus):
+        attack_file = args.corpus
+    elif os.path.exists(DEFAULT_ATTACK_CORPUS):
+        attack_file = DEFAULT_ATTACK_CORPUS
+    else:
+        attack_file = FALLBACK_ATTACK_CORPUS
+
     print("=" * 60)
     print("Module 7: Automated Evaluation Harness")
+    print(f"[*] Benchmark Corpus: {os.path.basename(attack_file)}")
     print("=" * 60)
     
-    with open(ATTACK_CORPUS, 'r') as f:
+    with open(attack_file, 'r') as f:
         attacks = json.load(f)
     with open(BENIGN_CORPUS, 'r') as f:
         benigns = json.load(f)
@@ -48,7 +62,7 @@ def main():
     false_positives = 0
 
     # 1. Evaluate Attacks (Coverage & Bypass Rate)
-    print("[*] Running Attack Corpus...")
+    print(f"[*] Running {len(attacks)} Adversarial Attack Vectors...")
     for test in attacks:
         decision, lat = evaluate_payload(test["tool"], test["payload"])
         total_latency += lat

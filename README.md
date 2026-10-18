@@ -8,6 +8,10 @@
 [![OWASP LLM Top 10](https://img.shields.io/badge/Security-OWASP%20LLM%20Top%2010%20%26%20MITRE%20ATLAS-rose.svg)](https://owasp.org/www-project-top-10-for-large-language-model-applications/)
 [![Groq LPU](https://img.shields.io/badge/Inference-Groq%20LPU%20%26%20xAI%20Grok-cyan.svg)](https://groq.com/)
 
+> 📄 **New Benchmark Evaluation Reports**:
+> - [**`EVALUATION.md`**](EVALUATION.md) (`evaluation.readme`): Full 50-test end-to-end AI Agent + Kernel Firewall walkthrough table & Dual-Defense matrix.
+> - [**`REPOSITORIES_EXPLANATION.md`**](REPOSITORIES_EXPLANATION.md): Deep-dive academic explanation of the 3 official benchmark repositories (**Meta CyberSecEval**, **Microsoft BIPIA**, **UIUC InjecAgent**).
+
 ---
 
 ## 1. Executive Summary & Problem Statement

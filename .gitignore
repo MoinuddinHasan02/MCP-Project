@@ -1,11 +1,9 @@
 
 # Logs and benchmark artifacts
-
 *.jsonl
-
 *.log
-
 stress_results.jsonl
+!module6-adversarial/**/*.jsonl
 
 
 
