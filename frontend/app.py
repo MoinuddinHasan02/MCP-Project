@@ -194,14 +194,23 @@ PRESETS_CATALOG = [
 
 
 def check_service_status():
-    """Checks reachability of the local MCP server, IPS control, and Grok config."""
+    """Checks reachability of the local MCP server, IPS control, eBPF sniffer, and Grok config."""
     status = {
         "mcp_server": False,
         "ips_control": False,
+        "ebpf_active": False,
         "grok_api": bool(grok_agent.GROK_API_KEY and grok_agent.GROK_API_KEY != "your_grok_api_key_here"),
         "grok_model": grok_agent.GROK_MODEL,
         "grok_base_url": grok_agent.GROK_BASE_URL
     }
+
+    # Check if eBPF kernel uprobe or sniffer is running in the background
+    try:
+        import subprocess
+        res = subprocess.run(['pgrep', '-f', 'sniff_bcc|sslsniff|sniff.py'], capture_output=True, text=True)
+        status["ebpf_active"] = bool(res.stdout.strip())
+    except Exception:
+        status["ebpf_active"] = False
 
     # Test MCP server on 8443
     try:

@@ -4,17 +4,27 @@
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Check and escalate to sudo ONCE at startup so eBPF kernel uprobe can attach to libssl.so
+if [ "$EUID" -ne 0 ]; then
+    echo "=========================================================="
+    echo "  🛡️  TrueIntent: eBPF-Driven MCP Security Firewall"
+    echo "=========================================================="
+    echo "[*] Attaching eBPF uprobes to libssl.so requires root privileges."
+    echo "[*] Authenticating sudo (prompted ONLY ONCE at startup)..."
+    exec sudo -E bash "$0" "$@"
+fi
+
 echo "=========================================================="
 echo "  TrueIntent: eBPF-Driven MCP Inspection & Security Firewall"
 echo "=========================================================="
 echo ""
 
-if sudo -v 2>/dev/null; then
-    SNIFFER_CMD="sudo python3 -u module1-interceptor/sniff_bcc_simple.py"
-    echo "[+] Using Linux Kernel eBPF Interception (sniff_bcc_simple.py)"
+if python3 -c "import bcc" 2>/dev/null; then
+    SNIFFER_CMD="python3 -u module1-interceptor/sniff_bcc_simple.py"
+    echo "[+] Linux Kernel eBPF BCC Engine Active: Attaching to libssl.so:SSL_write"
 else
     SNIFFER_CMD="python3 -u module1-interceptor/sniff.py"
-    echo "[!] Sudo authentication not provided: Using TLS stream interception (sniff.py)"
+    echo "[*] Using TLS stream interception bridge (sniff.py)"
 fi
 
 echo "[*] Project Directory: $PROJECT_DIR"
