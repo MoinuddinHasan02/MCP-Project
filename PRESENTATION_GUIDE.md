@@ -18,6 +18,7 @@
 10. [Empirical Benchmark & Evaluation Evidence](#10-empirical-benchmark--evaluation-evidence)
 11. [10-Slide PPT Presentation Structure](#11-10-slide-ppt-presentation-structure)
 12. [Top Viva & Examiner Q&A Defense](#12-top-viva--examiner-qa-defense)
+13. [OS & Technology Defense: Why Linux, What About Windows, & Windows Alternatives](#13-os--technology-defense-why-linux-what-about-windows--windows-alternatives)
 
 ---
 
@@ -264,6 +265,58 @@ To ensure zero synthetic bias, TrueIntent was evaluated against **three official
 
 #### Q5: What is 'Cross-Call Session Taint Tracking'?
 > **Answer:** *"In indirect prompt injection, an attack spans multiple turns: in Turn 1, the agent reads a malicious file or ticket; in Turn 2, the agent exfiltrates data. TrueIntent tracks session state: once an untrusted input is read, the session is marked as 'tainted', and any subsequent network egress (curl, wget, reverse sockets) is automatically blocked."*
+
+---
+
+## 13. OS & Technology Defense: Why Linux, What About Windows, & Windows Alternatives
+
+Examiners often ask: *"Why Linux? What about Windows users? Why eBPF specifically? Are there alternatives on Windows?"*  
+Here is the complete architectural and industry justification:
+
+### A. Why Linux? (Linux Hi Kyu?)
+1. **Production Reality of Autonomous AI Agents:**
+   * Enterprise AI agents, MCP servers, databases, and LLM hosting backends do **not** run on Windows desktops in production.
+   * **95%+ of enterprise infrastructure, cloud environments (AWS, GCP, Azure), Kubernetes clusters, and Docker containers run Linux.**
+   * TrueIntent is designed to protect production server infrastructure where high-value sensitive data (`/etc/shadow`, API secrets, databases) resides.
+2. **First-Class eBPF Integration:**
+   * Linux has native, hardened eBPF support embedded directly into the kernel mainline (since Linux 4.x/5.x).
+   * Linux dynamic symbol resolution in shared libraries (`libssl.so` via ELF tables) allows safe, non-invasive attachment via `uprobes`.
+3. **The eBPF Verifier (Guaranteed System Stability):**
+   * Traditional kernel modules can crash the OS (Kernel Panic). The Linux eBPF verifier statically analyzes bytecode before loading, proving mathematical safety: no infinite loops, no illegal memory dereferences, zero host crashes.
+
+### B. Why eBPF specifically? Why not standard proxies or kernel modules?
+1. **Zero-Instrumentation:**
+   * Proxies require configuring HTTP(S)_PROXY environment variables or modifying agent SDKs.
+   * eBPF attaches at the OS boundary; the agent process is completely unaware it is being observed (tamper-resistant).
+2. **Sub-Millisecond Speed:**
+   * In-process or user-space proxies introduce context switching between user space and network sockets. eBPF runs JIT-compiled native code at kernel speed with zero-copy ring buffers (`bpf_ring_buf`).
+3. **Preserves Native TLS Integrity:**
+   * Traditional SSL inspection requires generating self-signed root CA certificates and installing them into the agent's trust store. This breaks Mutual TLS (mTLS) and Certificate Pinning. eBPF uprobes read plaintext from user memory without touching the crypto handshake on the wire.
+
+### C. What About Windows Users? How Can They Use TrueIntent?
+Windows users are not left out — they can use TrueIntent through three enterprise-standard deployment patterns:
+
+1. **WSL2 (Windows Subsystem for Linux 2) — Immediate Local Developer Use:**
+   * Most AI developers on Windows already use WSL2 (Ubuntu) for Python, PyTorch, Docker, and CUDA tooling.
+   * WSL2 runs a genuine, full-fledged Linux kernel inside a lightweight Hyper-V utility VM.
+   * TrueIntent runs directly inside WSL2, monitoring local AI agents and MCP servers without needing a separate physical Linux box.
+2. **Docker Desktop & Dev Containers on Windows:**
+   * In enterprise setups, developers run their AI agents inside containerized microservices. TrueIntent can run as a containerized sidecar or host daemon protecting all container tool-call egress.
+3. **Centralized Enterprise Gateway / Edge Node:**
+   * For organizations with Windows workstations, the AI agent can run on Windows while routing MCP tool requests through a centralized TrueIntent-hardened Linux Edge Gateway or Bastion server.
+
+### D. Can We Implement This Natively in Windows? What are Windows Alternatives?
+If an examiner asks: *"What mechanisms exist inside Windows to do something similar, and why are they inferior or harder?"*, answer with this breakdown:
+
+| Windows Technology | How It Works | Comparison with Linux eBPF & Why It's Challenging |
+| :--- | :--- | :--- |
+| **`ebpf-for-windows` (Microsoft Project)** | Microsoft's official open-source project porting eBPF to Windows via Windows Driver Framework (WDF). | **Emerging, but Lacks Uprobes:** Focuses heavily on network XDP and socket filtering. Does not yet have mature user-space dynamic probes (`uprobes`) on Windows DLLs (`schannel.dll` / OpenSSL) equivalent to Linux BCC. |
+| **WFP (Windows Filtering Platform)** | Windows kernel network traffic filtering API (used by Windows Defender and third-party firewalls). | **Suffers from the Same TLS Blind Spot:** WFP filters at Layer 3/4/7 network packet level. Because MCP traffic is TLS encrypted, WFP cannot see the JSON-RPC tool parameters without a TLS-terminating proxy. |
+| **User-Space API Hooking (Microsoft Detours / MinHook)** | Injects a DLL into the agent process to hook `EncryptMessage` or `SSL_write`. | **Fragile & Flagged by AV:** Requires DLL injection (`CreateRemoteThread`), which triggers Antivirus/EDR alerts as malicious behavior. Vulnerable to memory tampering and process crashes. |
+| **ETW (Event Tracing for Windows)** | High-speed kernel/user tracing system built into Windows. | **Telemetry Only (No Active IPS):** ETW is strictly passive (logging/auditing). It cannot perform out-of-band active wire dropping before a tool executes. |
+
+### Summary Punchline for Judges:
+> *"Windows is primarily a developer's desktop UI, but Linux is the undisputed backbone of AI agent infrastructure. By building on native Linux eBPF, we target where production agents actually run, while Windows developers seamlessly run TrueIntent today via WSL2 and Docker containers."*
 
 ---
 
