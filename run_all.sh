@@ -42,12 +42,20 @@ $SNIFFER_CMD 2>&1 | \
   python3 -u module4-semantic/inspector.py &
 PIPELINE_PID=$!
 
+sleep 1
+
+echo "[*] Starting Live Flow Visualizer (http://127.0.0.1:8080)..."
+cd "$PROJECT_DIR"
+python3 frontend/app.py &
+FRONTEND_PID=$!
+
 echo -e "\n[+] SUCCESS: All core components are running!"
-echo "[+] Security Dashboard is live at: http://127.0.0.1:5000"
-echo "[+] MCP Server: https://127.0.0.1:8443"
-echo "[+] IPS Control Endpoint: http://127.0.0.1:8444"
+echo "[+] Interactive Visualizer is live at: http://127.0.0.1:8080 (Live Grok AI Agent)"
+echo "[+] Security Dashboard is live at:     http://127.0.0.1:5000 (Auth: admin / admin123)"
+echo "[+] Secure MCP Server:                https://127.0.0.1:8443/mcp"
+echo "[+] Out-of-Band IPS Control:           http://127.0.0.1:8444/ips-control"
 echo "[+] Leave this terminal open. Press Ctrl+C at any time to safely shut everything down.\n"
 
 # Wait for user interruption to clean up background jobs
-trap "echo -e '\n[*] Shutting down TrueIntent services...'; kill $MCP_PID $DASH_PID $PIPELINE_PID 2>/dev/null; sudo pkill -f sniff_bcc_simple.py; sudo pkill -f parser.py; sudo pkill -f engine.py; sudo pkill -f inspector.py; exit" SIGINT SIGTERM
+trap "echo -e '\n[*] Shutting down TrueIntent services...'; kill $MCP_PID $DASH_PID $PIPELINE_PID $FRONTEND_PID 2>/dev/null; sudo pkill -f sniff_bcc_simple.py; sudo pkill -f parser.py; sudo pkill -f engine.py; sudo pkill -f inspector.py; sudo pkill -f 'frontend/app.py'; exit" SIGINT SIGTERM
 wait
