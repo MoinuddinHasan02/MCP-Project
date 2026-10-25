@@ -232,9 +232,9 @@
           </span>
         </div>
 
-        <button onclick="triggerVisualSimulation()" id="btn-simulate" class="px-7 py-3 rounded-xl text-xs font-extrabold uppercase tracking-wider bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-95 text-white shadow-xl shadow-brand-purple/25 transition-all cursor-pointer flex items-center justify-center space-x-2 flex-shrink-0 active:scale-95">
-          <i data-lucide="play" class="w-4 h-4 fill-current"></i>
-          <span>Simulate Attack Now</span>
+        <button onclick="triggerVisualSimulation()" id="btn-simulate" class="px-5 py-2.5 rounded-xl text-xs font-semibold bg-brand-blue text-white hover:bg-blue-600 transition-colors shadow-sm flex items-center justify-center space-x-2 flex-shrink-0 cursor-pointer active:scale-98">
+          <i data-lucide="play" class="w-3.5 h-3.5 fill-current"></i>
+          <span>Simulate Attack</span>
         </button>
       </div>
     </div>
@@ -711,7 +711,7 @@
     function triggerVisualSimulation() {
       const btn = document.getElementById('btn-simulate');
       btn.disabled = true;
-      btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Simulating Trajectory...</span>`;
+      btn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i><span>Simulating...</span>`;
       lucide.createIcons();
 
       const unprotNodes = ['unprot-node-1', 'unprot-node-2', 'unprot-node-3'];
@@ -733,7 +733,7 @@
       const tl = gsap.timeline({
         onComplete: () => {
           btn.disabled = false;
-          btn.innerHTML = `<i data-lucide="rotate-ccw" class="w-4 h-4"></i><span>Run Again</span>`;
+          btn.innerHTML = `<i data-lucide="play" class="w-3.5 h-3.5 fill-current"></i><span>Simulate Attack</span>`;
           lucide.createIcons();
           
           // Flash the final stamps
