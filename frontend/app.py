@@ -1852,6 +1852,21 @@ class VisualizerHTTPHandler(BaseHTTPRequestHandler):
                 self.end_headers()
             return
 
+        elif parsed.path == "/compare" or parsed.path == "/compare.html":
+            html_file = os.path.join(os.path.dirname(__file__), "compare.html")
+            if os.path.exists(html_file):
+                with open(html_file, "rb") as f:
+                    content = f.read()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(content)))
+                self.end_headers()
+                self.wfile.write(content)
+            else:
+                self.send_response(404)
+                self.end_headers()
+            return
+
         elif parsed.path == "/api/status":
             status_data = check_service_status()
             body = json.dumps(status_data).encode("utf-8")
