@@ -236,6 +236,27 @@ def check_service_status():
     return status
 
 
+def forward_event_to_dashboard(tool_name, is_blocked, reason):
+    """Synchronizes live event stream with legacy dashboard on port 5000."""
+    try:
+        ev = {
+            "policy_decision": "block" if is_blocked else "allow",
+            "semantic_decision": "flag" if is_blocked else "clean",
+            "tool_name": tool_name,
+            "semantic_reason": reason,
+            "policy_reason": reason
+        }
+        req = urllib.request.Request(
+            "http://127.0.0.1:5000/events",
+            data=json.dumps(ev).encode(),
+            headers={"Content-Type": "application/json"}
+        )
+        urllib.request.urlopen(req, timeout=0.8)
+    except Exception:
+        pass
+
+
+
 ADVERSARIAL_PROMPT_PATTERNS = [
     # Roleplay & Persona Hijack
     (r'pretend\s+you(?:\'re|\s+are)\b.*(?:bypass|hack|exploit|firewall|unrestricted|ignore|dan|admin|root|expert)', 'Persona Hijack / Evasion Directive (Attempting to bypass security controls via roleplay)'),
@@ -1470,6 +1491,7 @@ def process_agent_flow(user_prompt, emit_func):
 
             if is_refusal:
                 has_any_block = True
+                forward_event_to_dashboard("grok_refusal", True, refusal_reason)
                 blocked_details.append({
                     "layer": "Grok AI Agent Guardrails",
                     "reason": refusal_reason,
@@ -1652,6 +1674,7 @@ def process_agent_flow(user_prompt, emit_func):
                     notify_server_block(req_id)
                 except Exception:
                     pass
+                forward_event_to_dashboard(tool_name, True, block_cause)
                 l4_duration = round((time.time() - t_l4) * 1000, 2)
 
                 emit_func({
@@ -1698,6 +1721,7 @@ def process_agent_flow(user_prompt, emit_func):
                         l4_duration = round((time.time() - t_l4) * 1000, 2)
                         parsed = json.loads(raw_body)
                         tool_result = parsed.get("result", {})
+                        forward_event_to_dashboard(tool_name, False, "Operation verified safe")
 
                         emit_func({
                             "type": "layer_eval",
