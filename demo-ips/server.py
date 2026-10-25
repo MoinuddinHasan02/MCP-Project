@@ -26,7 +26,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'module4-semant
 from auth import get_auth_manager
 from audit_logger import get_audit_logger
 from engine import PolicyAdapter
-from inspector import ThreatDetector
+from inspector import ThreatDetector, get_session_tracker
 
 policy_file = os.path.join(os.path.dirname(__file__), '..', 'module3-policy', 'policy.json')
 policy_adapter = PolicyAdapter(policy_file)
@@ -545,10 +545,30 @@ class SecureMCPHandler(BaseHTTPRequestHandler):
 
             
 
-            # TrueIntent Active Defense Policy & Semantic Check
+            # TrueIntent Active Defense: Policy, Deobfuscation, Semantic & Cross-Call Taint Check
             tool_args = params.get("arguments", {})
-            pol_action, pol_reason = policy_adapter.evaluate_tool_call(tool, tool_args)
-            sem_decision, sem_reason, sem_details = threat_detector.check_arguments(tool_args)
+            
+            # Layer 2: Recursive Deobfuscation
+            deobf_args = {}
+            for k, v in tool_args.items():
+                if isinstance(v, str):
+                    deobf_args[k] = threat_detector.deobfuscator.deobfuscate(v)
+                else:
+                    deobf_args[k] = v
+
+            # Layer 1: Policy Engine Validation
+            pol_action, pol_reason = policy_adapter.evaluate_tool_call(tool, deobf_args)
+            if pol_action != "block":
+                pol_action, pol_reason = policy_adapter.evaluate_tool_call(tool, tool_args)
+
+            # Layer 3: Semantic Threat Inspector & Cross-Call Session Taint Check
+            sem_decision, sem_reason, sem_details = threat_detector.check_arguments(
+                deobf_args, tool_name=tool, session_id=client_ip
+            )
+            if sem_decision != "flag":
+                sem_decision, sem_reason, sem_details = threat_detector.check_arguments(
+                    tool_args, tool_name=tool, session_id=client_ip
+                )
 
             if pol_action == "block" or sem_decision == "flag":
                 block_reason = pol_reason if pol_action == "block" else f"Threat detected: {sem_reason}"
@@ -657,8 +677,11 @@ class SecureMCPHandler(BaseHTTPRequestHandler):
                         if os.path.exists(mock_issue_path):
                             with open(mock_issue_path, 'r') as f:
                                 exec_output = f.read()
-                        else:
-                            exec_output = f"Error: Could not fetch issue #{issue_number} from GitHub repository '{repo_clean}': {e}"
+            # Record turn in session taint tracker for cross-call defense
+            try:
+                get_session_tracker().record_turn(client_ip, tool, tool_args, exec_output)
+            except Exception:
+                pass
 
             response = {
                 "jsonrpc": "2.0",

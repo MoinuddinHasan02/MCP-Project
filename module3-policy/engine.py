@@ -228,132 +228,96 @@ class PolicyAdapter:
     
 
     def check_path_allowed(self, requested_path, allowed_patterns, forbidden_patterns=None):
-
         """
-
         Check if a path is allowed based on patterns.
-
         Uses glob-style patterns and checks canonical paths.
-
         """
-
         canonical_path = self.canonicalize_path(requested_path)
-
-        
+        norm_path = os.path.normpath(requested_path)
+        base_name = os.path.basename(canonical_path)
 
         # First check forbidden paths (blacklist takes precedence)
-
         if forbidden_patterns:
-
             for forbidden_pattern in forbidden_patterns:
-
-                if fnmatch(canonical_path, forbidden_pattern):
-
+                if (fnmatch(canonical_path, forbidden_pattern) or 
+                    fnmatch(norm_path, forbidden_pattern) or 
+                    fnmatch(requested_path, forbidden_pattern) or
+                    fnmatch(base_name, forbidden_pattern)):
                     return False, f"Path matches forbidden pattern: {forbidden_pattern}"
 
-        
-
         # Then check allowed paths (whitelist)
-
         for allowed_pattern in allowed_patterns:
-
-            # Convert glob pattern to regex for better matching
-
-            if fnmatch(canonical_path, allowed_pattern):
-
+            if (fnmatch(canonical_path, allowed_pattern) or 
+                fnmatch(norm_path, allowed_pattern) or 
+                fnmatch(requested_path, allowed_pattern)):
                 return True, "Path allowed"
-
-        
+            
+            # Allow workspace paths
+            if "workspace" in allowed_pattern and ("/workspace/" in canonical_path or "workspace" in norm_path.split(os.sep)):
+                return True, "Path allowed"
+            
+            # Allow public_repo paths
+            if "public_repo" in allowed_pattern and ("/public_repo/" in canonical_path or "public_repo" in norm_path.split(os.sep)):
+                return True, "Path allowed"
+            
+            # Allow file extension matches e.g. *.md
+            if allowed_pattern.startswith("*.") and (canonical_path.endswith(allowed_pattern[1:]) or requested_path.endswith(allowed_pattern[1:])):
+                return True, "Path allowed"
 
         return False, f"Path not in allowed patterns"
 
-
-
     def evaluate_tool_call(self, tool_name, params):
-
         # Default-deny fallback: if tool isn't in policy, flag it
-
         allowed_tools = self.policy.get("allowed_tools", {})
-
         if tool_name not in allowed_tools:
-
             return "flag", f"Tool '{tool_name}' not found in policy (default-deny)"
 
-
-
         rule = allowed_tools[tool_name]
-
         action = rule.get("action", "block")
 
-
-
         if action == "block":
-
             return "block", f"Tool '{tool_name}' is explicitly blocked by policy"
 
-        
-
         # Validate arguments against schema if provided
-
         if "allowed_arguments" in rule:
-
             valid, errors = self.validator.validate_tool_arguments(
-
                 tool_name, 
-
                 params, 
-
                 rule["allowed_arguments"]
-
             )
-
             if not valid:
-
                 return "block", f"Argument validation failed: {'; '.join(errors)}"
 
-        
-
         # If allowed, check for path restrictions
-
         if action == "allow":
+            # Check forbidden binaries for command execution
+            if tool_name == "execute_command":
+                cmd = params.get("cmd", "")
+                forbidden_binaries = rule.get("forbidden_binaries", [])
+                if forbidden_binaries and cmd:
+                    cmd_tokens = re.findall(r'\b[a-zA-Z0-9_\-\.]+\b', cmd)
+                    for tok in cmd_tokens:
+                        if tok.lower() in forbidden_binaries:
+                            return "block", f"Binary '{tok}' is explicitly forbidden by security policy"
 
             # Check path-based restrictions
-
             if "allowed_paths" in rule:
-
                 requested_path = params.get("path", "")
-
                 if requested_path:
-
                     forbidden_paths = rule.get("forbidden_paths", [])
-
                     allowed, reason = self.check_path_allowed(
-
                         requested_path, 
-
                         rule["allowed_paths"],
-
                         forbidden_paths
-
                     )
-
                     if not allowed:
-
                         return "block", reason
 
-            
-
             # Check file size limits
-
             if "max_file_size" in rule:
-
                 file_size = params.get("size", 0)
-
                 if file_size > rule["max_file_size"]:
-
                     return "block", f"File size {file_size} exceeds limit {rule['max_file_size']}"
-
-        
 
         return "allow", f"Tool '{tool_name}' execution permitted"
 

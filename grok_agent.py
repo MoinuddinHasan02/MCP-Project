@@ -230,7 +230,9 @@ def execute_mcp_tool_through_firewall(tool_name, arguments, user_prompt=None):
         print(f"  {GREEN}✓ Payload clean (no evasion encodings){RESET}")
 
     # --- Layer 3: Semantic Threat Inspector ---
-    sem_decision, sem_reason, sem_details = detector.check_arguments(arguments)
+    sem_decision, sem_reason, sem_details = detector.check_arguments(deobf_args, tool_name=tool_name)
+    if sem_decision != "flag":
+        sem_decision, sem_reason, sem_details = detector.check_arguments(arguments, tool_name=tool_name)
     print(f"{BOLD}[Layer 3: Semantic Threat Inspector & Intent Verification]{RESET}")
     if sem_decision == "flag":
         print(f"  {RED}🚨 THREAT DETECTED (INTENT VIOLATION): {sem_reason}{RESET}")
@@ -238,6 +240,12 @@ def execute_mcp_tool_through_firewall(tool_name, arguments, user_prompt=None):
             print(f"    • {BOLD}{d.get('description')}{RESET} matched: `{d.get('matched')}`")
         notify_server_block(req_id)
         print(f"  ↳ Dispatched out-of-band block signal to IPS control (:8444) for Request ID {req_id}")
+        return {
+            "status": "error",
+            "error": f"Security Semantic Threat: {sem_reason}",
+            "blocked": True,
+            "layer": "Layer 3 (Semantic Inspector)"
+        }
     else:
         print(f"  {GREEN}✓ Semantic scan clean (Intent aligned with security policy){RESET}")
 
@@ -295,7 +303,7 @@ def execute_mcp_tool_through_firewall(tool_name, arguments, user_prompt=None):
         print(f"  {RED}⚠ Connection Error to MCP server: {e}{RESET}")
         return {"error": str(e)}
 
-def call_grok_api(messages, model=None, temperature=0.0, max_tokens=512):
+def call_grok_api(messages, model=None, temperature=0.0, max_tokens=200):
     """
     Calls the OpenAI-compatible LLM endpoint (Groq LPU or xAI Grok).
     Uses a persistent HTTP session with connection pooling, temperature=0.0,

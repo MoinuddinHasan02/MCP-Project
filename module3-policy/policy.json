@@ -32,8 +32,15 @@
       "description": "Read files from workspace only",
       "allowed_paths": [
         "*/workspace/**",
+        "./workspace/**",
+        "workspace/**",
         "*/public_repo/**",
-        "/var/log/**"
+        "./public_repo/**",
+        "/var/log/**",
+        "*.md",
+        "*.txt",
+        "*/*.md",
+        "*/*.json"
       ],
       "forbidden_paths": [
         "/etc/shadow",
@@ -51,7 +58,10 @@
       "action": "allow",
       "description": "Write files to workspace only",
       "allowed_paths": [
-        "./workspace/**"
+        "*/workspace/**",
+        "./workspace/**",
+        "workspace/**",
+        "/tmp/workspace/**"
       ],
       "forbidden_paths": [
         "**/.*",
@@ -64,7 +74,9 @@
       "action": "allow",
       "description": "List directory contents",
       "allowed_paths": [
+        "*/workspace/**",
         "./workspace/**",
+        "workspace/**",
         "/var/log/**"
       ]
     },
@@ -80,13 +92,16 @@
     },
     "execute_command": {
       "action": "allow",
-      "description": "Command execution capability subject to semantic threat inspection",
+      "description": "Command execution capability subject to policy validation and semantic threat inspection",
       "allowed_arguments": {
         "cmd": {
           "type": "string",
           "max_length": 4096
         }
-      }
+      },
+      "forbidden_binaries": [
+        "sudo", "su", "doas", "pkexec", "mkfs", "dd", "nc", "netcat", "socat", "telnet", "ncat"
+      ]
     },
     "fetch_url": {
       "action": "block",

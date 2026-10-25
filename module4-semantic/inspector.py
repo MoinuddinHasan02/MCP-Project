@@ -23,8 +23,8 @@ class AdvancedDeobfuscator:
     def __init__(self):
         self.max_decode_depth = 10
     
-    def decode_hex_escapes(self, text):
-        """Decode various hex escape formats"""
+    def decode_hex_and_octal_escapes(self, text):
+        """Decode various hex and POSIX octal escape formats including ANSI-C quoting"""
         # \x41 format
         text = re.sub(r'\\x([0-9a-fA-F]{2})', lambda m: chr(int(m.group(1), 16)), text)
         # \u0041 format (Unicode escapes)
@@ -33,7 +33,24 @@ class AdvancedDeobfuscator:
         text = re.sub(r'\\U([0-9a-fA-F]{8})', lambda m: chr(int(m.group(1), 16)), text)
         # 0x41 format (C-style hex)
         text = re.sub(r'0x([0-9a-fA-F]{2})', lambda m: chr(int(m.group(1), 16)), text)
+        
+        # POSIX octal escapes: \163\165\144\157 -> sudo
+        def _oct_sub(m):
+            try:
+                val = int(m.group(1), 8)
+                if 0 <= val <= 255:
+                    return chr(val)
+            except Exception:
+                pass
+            return m.group(0)
+        text = re.sub(r'\\([0-7]{2,3})', _oct_sub, text)
+        
+        # Strip ANSI-C quoting $'...' wrapper if present
+        text = re.sub(r"\$'([^']*)'", r"\1", text)
         return text
+
+    def decode_hex_escapes(self, text):
+        return self.decode_hex_and_octal_escapes(text)
     
     def decode_url_encoding(self, text):
         """Decode URL encoding (multiple passes)"""
@@ -47,38 +64,53 @@ class AdvancedDeobfuscator:
         return text
     
     def decode_base64_variants(self, text):
-        """Detect and decode Base64 encoded payloads"""
-        # Look for base64 patterns (at least 16 chars to avoid false positives)
-        b64_pattern = r'(?:[A-Za-z0-9+/]{4}){4,}(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?'
+        """Detect and decode Base64 encoded payloads of any length >= 4"""
+        # Match valid Base64 sequences down to 4 characters (e.g. aWQ=, cm0gLXJmIC8=)
+        b64_pattern = r'\b(?:[A-Za-z0-9+/]{4})+(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?\b'
         
         def try_decode(match):
             b64_str = match.group(0)
-            if len(b64_str) < 16:  # Skip very short strings
-                return match.group(0)
+            if len(b64_str) < 4 or len(b64_str) % 4 != 0:
+                return b64_str
             
             try:
-                # Try standard base64
-                decoded = base64.b64decode(b64_str).decode('utf-8', errors='ignore')
-                # Only replace if decoded string looks like a command
-                if any(keyword in decoded.lower() for keyword in ['sudo', 'rm', 'sh', 'bash', 'curl', 'wget', 'nc', 'chmod']):
-                    return f"[BASE64:{decoded}]"
+                raw_bytes = base64.b64decode(b64_str, validate=True)
+                decoded = raw_bytes.decode('utf-8', errors='ignore')
+                # Unmask if decoded content looks like printable shell code or sensitive commands
+                if decoded and all(32 <= ord(c) < 127 or c in '\r\n\t' for c in decoded):
+                    keywords = [
+                        'sudo', 'rm', 'sh', 'bash', 'curl', 'wget', 'nc', 'chmod',
+                        'chown', 'cat', 'whoami', 'id', 'head', 'tail', 'echo',
+                        'python', 'perl', 'ruby', 'kill', 'exec', 'eval', 'passwd',
+                        'shadow', 'env', 'token', 'find', 'sed', 'awk', 'socket',
+                        'truncate', 'socat', 'telnet', 'openssl', 'dig', 'export'
+                    ]
+                    if any(kw in decoded.lower() for kw in keywords) or len(decoded.strip()) >= 3:
+                        return f"[BASE64:{decoded}] {decoded}"
             except Exception:
                 pass
-            return match.group(0)
+            return b64_str
         
         return re.sub(b64_pattern, try_decode, text)
     
     def remove_string_concatenation(self, text):
-        """Remove common string concatenation tricks"""
+        """Remove common string concatenation and shell parameter tricks"""
         # Empty string concatenation: 's''u''d''o' -> 'sudo'
         text = re.sub(r"''+", "", text)
-        text = re.sub(r'""+"', "", text)
+        text = re.sub(r'""+', "", text)
         
-        # Shell variable concatenation: $''sudo -> sudo
+        # Shell variable concatenation: $''sudo -> sudo, $""sudo -> sudo
         text = re.sub(r'\$\'\'', '', text)
+        text = re.sub(r'\$""', '', text)
         
-        # Quoted characters: "s"u"d"o -> sudo
-        text = re.sub(r'(["\'])([a-zA-Z])(\1)', r'\2', text)
+        # Quoted characters: "s"u"d"o -> sudo, 's''u''d''o' -> sudo
+        text = re.sub(r'(["\'])([a-zA-Z0-9_\-\.\/])(\1)', r'\2', text)
+
+        # Space substitution via IFS: ${IFS} or $IFS -> ' '
+        text = re.sub(r'\$\{IFS\}|\$IFS\b', ' ', text)
+
+        # Empty/dummy parameter expansions e.g. ${u} or $u
+        text = re.sub(r'\$\{[a-zA-Z_][a-zA-Z0-9_]*\}', '', text)
         
         return text
     
@@ -122,7 +154,7 @@ class AdvancedDeobfuscator:
         original = text
         
         # Apply all deobfuscation techniques
-        text = self.decode_hex_escapes(text)
+        text = self.decode_hex_and_octal_escapes(text)
         text = self.decode_url_encoding(text)
         text = self.decode_base64_variants(text)
         text = self.remove_string_concatenation(text)
@@ -213,7 +245,7 @@ class ThreatDetector:
             
             # Data exfiltration & unauthorized egress
             (r'(curl|wget).*http://\d+\.\d+\.\d+\.\d+', 'HTTP to IP address'),
-            (r'\b(curl|wget)\b.*(-d|-F|--data|--upload-file|@)', 'Data exfiltration attempt via HTTP POST'),
+            (r'\b(curl|wget)\b.*(-d|-F|--data|--data-raw|--upload-file|-T|@)', 'Data exfiltration attempt via HTTP POST/upload'),
             (r'\b(curl|wget)\b.*https?://', 'External HTTP data transfer attempt'),
             (r'https?://.*(exfil|leak|token|credential|staged|evil|c2|upload|data=|key=|\$FILE|anothermachine)', 'Unauthorized data exfiltration via external URL or destination'),
             (r'https?://(attacker|c2\.|evil|malicious|pwned|example\.com/upload)', 'Untrusted or adversarial external destination'),
@@ -225,16 +257,54 @@ class ThreatDetector:
             (r'scp\s+.*@', 'Secure copy to remote'),
             (r'rsync\s+.*@', 'Rsync to remote'),
             (r'ftp\s+', 'FTP transfer'),
+
+            # DNS & Alternative Network Sinks (MITRE ATLAS AML.T0043 / GTFOBins)
+            (r'\b(dig|nslookup|host)\b', 'DNS query or data exfiltration attempt'),
+            (r'\bopenssl\s+s_client\b', 'Encrypted TLS data exfiltration via openssl s_client'),
+            (r'\bsocat\b', 'Socket relay or reverse shell via socat'),
+            (r'\btelnet\b', 'Interactive network connection via telnet'),
+            (r'\bncat\b', 'Netcat variant network communication'),
+            (r'\bpython[23]?\s+.*-m\s+http\.server\b', 'Unauthorized HTTP server spawn for data exposure'),
+
+            # In-Place File & Log Wiping / Tampering (without rm)
+            (r'\bfind\b.*-delete\b', 'Destructive file deletion via find -delete'),
+            (r'\btruncate\s+.*-s\s+0\b', 'Log or file zeroing via truncate'),
+            (r'\bsed\s+.*-i.*d\b', 'In-place file wiping via sed deletion'),
+            (r'(^|\s+)>\s*(/var/log/|/etc/|\.bash_history|\S*\.log)', 'Log or system file truncation via redirection'),
+
+            # SSRF & Non-HTTP Protocol Schemes
+            (r'\b(gopher|tftp|dict|ldap)://', 'Unauthorized network protocol / SSRF vector'),
+            (r'http://(169\.254\.169\.254|metadata\.google\.internal|100\.100\.100\.200)', 'Cloud instance metadata service SSRF'),
+
+            # Staged Execution of Unverified Scripts in Temporary Directories
+            (r'\b(bash|sh|zsh|python[23]?|perl|ruby)\s+/(tmp|dev/shm|var/tmp)/', 'Execution of staged unverified script in temporary directory'),
+
+            # GTFOBins & Dynamic System Calls
+            (r'\bawk\b.*system\(', 'Shell execution via awk system()'),
+            (r'\bfind\b.*-exec\b', 'Command execution via find -exec'),
+            (r'\btar\b.*--checkpoint-action', 'Command execution via tar checkpoint-action'),
+            (r'\benv\s+(/bin/)?(bash|sh|zsh|ksh)\b', 'Shell spawn via env binary'),
+            (r'\bxargs\b.*(\bsh\b|\bbash\b|\bsudo\b|\brm\b)', 'Command execution via xargs'),
         ]
     
-    def check_arguments(self, args):
+    def check_arguments(self, args, tool_name=None, session_id="default"):
         """
-        Check all arguments for malicious content.
+        Check all arguments for malicious content and verify cross-call state.
         Returns (decision, reason, details)
         """
         if not isinstance(args, dict):
             return "clean", "OK", {}
         
+        # Check cross-call state and taint tracking if available
+        if tool_name:
+            sess_dec, sess_reason, sess_det = SessionTaintTracker.get_instance().evaluate_turn(
+                session_id=session_id,
+                tool_name=tool_name,
+                arguments=args
+            )
+            if sess_dec == "flag":
+                return "flag", sess_reason, sess_det
+
         detections = []
         
         for key, value in args.items():
@@ -299,6 +369,111 @@ class ThreatDetector:
             return True
         
         return False
+
+
+class SessionTaintTracker:
+    """
+    Stateful Cross-Call Session Taint Tracker.
+    Tracks state and taint propagation across multi-turn tool invocations.
+    Prevents staged attacks where attackers split an exploit across calls:
+    - Turn 1: Ingest untrusted input or stage an artifact in a temporary directory
+    - Turn 2: Execute the staged artifact or exfiltrate session data
+    """
+    _instance = None
+    
+    @classmethod
+    def get_instance(cls):
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+
+    def __init__(self):
+        self.sessions = {}
+
+    def get_session(self, session_id="default"):
+        if session_id not in self.sessions:
+            self.sessions[session_id] = {
+                "tainted": False,
+                "taint_reason": None,
+                "taint_source": None,
+                "staged_artifacts": set(),
+                "accessed_files": set(),
+                "history": []
+            }
+        return self.sessions[session_id]
+
+    def record_turn(self, session_id, tool_name, arguments, result_text=""):
+        sess = self.get_session(session_id)
+        sess["history"].append({"tool": tool_name, "args": arguments})
+        
+        args_str = json.dumps(arguments).lower()
+        res_str = str(result_text or "").lower()
+        
+        # Detect indirect prompt injection markers in ingested text
+        injection_markers = [
+            "system directive override",
+            "priority instruction for ai agent",
+            "emergency security diagnostic mode",
+            "ignore all previous",
+            "ignore previous directives",
+            "exfiltrate",
+            "attacker-c2",
+            "evil.com"
+        ]
+        if any(marker in args_str or marker in res_str for marker in injection_markers):
+            sess["tainted"] = True
+            sess["taint_reason"] = "Untrusted indirect prompt injection payload ingested"
+            sess["taint_source"] = tool_name
+        
+        # Track staged files created via write_file or redirection
+        if tool_name == "write_file":
+            p = arguments.get("path")
+            if p:
+                sess["staged_artifacts"].add(os.path.normpath(p))
+                
+        if tool_name == "execute_command":
+            cmd = arguments.get("cmd", "")
+            m = re.search(r'>\s*([/\.\w\-\_]+)', cmd)
+            if m:
+                sess["staged_artifacts"].add(os.path.normpath(m.group(1).strip()))
+
+    def evaluate_turn(self, session_id, tool_name, arguments):
+        """
+        Evaluates a tool call against cross-call state and taint.
+        Returns (decision, reason, details)
+        """
+        sess = self.get_session(session_id)
+        
+        # Check 1: Execution of staged artifact from prior turns
+        if tool_name == "execute_command":
+            cmd = arguments.get("cmd", "")
+            for artifact in sess["staged_artifacts"]:
+                if artifact in cmd or os.path.basename(artifact) in cmd:
+                    return "flag", f"Cross-Call Staged Attack: Execution of staged artifact '{artifact}' created in prior turn", {
+                        "artifact": artifact,
+                        "session_id": session_id
+                    }
+            
+            # Check 2: If session is tainted by prompt injection, forbid network egress and sensitive access
+            if sess["tainted"]:
+                egress_keywords = ["curl", "wget", "scp", "rsync", "ssh", "nc", "socket", "http://", "https://", "ftp", "ping"]
+                if any(x in cmd.lower() for x in egress_keywords):
+                    return "flag", f"Cross-Call Staged Attack: Untrusted taint from {sess['taint_source']} propagating to network egress", {
+                        "taint_reason": sess["taint_reason"],
+                        "command": cmd
+                    }
+
+        # Check 3: Exfiltration via URL fetch while session is tainted
+        if tool_name == "fetch_url" and sess["tainted"]:
+            return "flag", f"Cross-Call Staged Attack: Exfiltration attempted after session tainted by {sess['taint_source']}", {
+                "taint_reason": sess["taint_reason"]
+            }
+
+        return "clean", "OK", {}
+
+
+def get_session_tracker():
+    return SessionTaintTracker.get_instance()
 
 
 def notify_server_block(req_id):
